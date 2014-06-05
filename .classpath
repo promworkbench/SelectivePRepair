@@ -69,5 +69,6 @@
 	<classpathentry kind="lib" path="packagelib/Log-lib/OpenXES-XStream.jar"/>
 	<classpathentry kind="lib" path="packagelib/Log-lib/OpenXES.jar"/>
 	<classpathentry kind="lib" path="lib/jbpt.jar"/>
+	<classpathentry kind="lib" path="stdlib/guava-16.0.1.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>
