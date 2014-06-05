@@ -68,5 +68,6 @@
 	<classpathentry kind="lib" path="packagelib/Widgets.jar"/>
 	<classpathentry kind="lib" path="packagelib/Log-lib/OpenXES-XStream.jar"/>
 	<classpathentry kind="lib" path="packagelib/Log-lib/OpenXES.jar"/>
+	<classpathentry kind="lib" path="lib/jbpt-0.2.401.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>
