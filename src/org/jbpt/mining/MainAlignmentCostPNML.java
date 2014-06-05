@@ -37,6 +37,10 @@ import ee.ut.prom.XLogReader;
 
 public class MainAlignmentCostPNML {
 
+	/**
+	 * args[0] - pnml file
+	 * args[1] - xes file
+	 */
 	public static void main(String[] args) throws Exception {
 		PNMLSerializer PNML = new PNMLSerializer();
 		NetSystem sys = PNML.parse(args[0]);
