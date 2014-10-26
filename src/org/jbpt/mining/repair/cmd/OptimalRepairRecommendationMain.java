@@ -1,5 +1,4 @@
 package org.jbpt.mining.repair.cmd;
-import java.io.IOException;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -12,17 +11,14 @@ import org.deckfour.xes.info.XLogInfoFactory;
 import org.deckfour.xes.info.impl.XLogInfoImpl;
 import org.deckfour.xes.model.XLog;
 import org.jbpt.mining.repair.CostFunction;
-import org.jbpt.mining.repair.GreedyGoldrattRepairRecommendationSearch;
+import org.jbpt.mining.repair.GoldrattRepairRecommendationSearch;
 import org.jbpt.mining.repair.PetrinetRepair;
 import org.jbpt.mining.repair.RepairConstraint;
 import org.jbpt.mining.repair.RepairRecommendation;
 import org.jbpt.petri.Flow;
 import org.jbpt.petri.NetSystem;
 import org.jbpt.petri.io.PNMLSerializer;
-import org.jbpt.throwable.SerializationException;
-import org.processmining.models.graphbased.directed.petrinet.PetrinetEdge;
 import org.processmining.models.graphbased.directed.petrinet.PetrinetGraph;
-import org.processmining.models.graphbased.directed.petrinet.PetrinetNode;
 import org.processmining.models.graphbased.directed.petrinet.elements.Place;
 import org.processmining.models.graphbased.directed.petrinet.elements.Transition;
 import org.processmining.models.graphbased.directed.petrinet.impl.PetrinetFactory;
@@ -74,9 +70,6 @@ public class OptimalRepairRecommendationMain {
 				net.addArc(t2t.get(f.getSource()),p2p.get(f.getTarget()));
 			}
 		}
-		
-		// SERIALIZE NET
-		serializeNet(net, "original");
 
 		// PREPARE MARKINGS
 		Marking initMarking = new Marking();
@@ -170,13 +163,15 @@ public class OptimalRepairRecommendationMain {
 		//BruteForceRepairRecommendationSearch opt = new BruteForceRepairRecommendationSearch(net, initMarking, finalMarkings, log, costMOS, costMOT, mapping, true);
 		//ImprovedBruteForceRepairRecommendationSearch opt = new ImprovedBruteForceRepairRecommendationSearch(net, initMarking, finalMarkings, log, costMOS, costMOT, mapping, true);
 		//GreedyRepairRecommendationSearch opt = new GreedyRepairRecommendationSearch(net, initMarking, finalMarkings, log, costMOS, costMOT, mapping, true);
-		GreedyGoldrattRepairRecommendationSearch opt = new GreedyGoldrattRepairRecommendationSearch(net, initMarking, finalMarkings, log, costMOS, costMOT, mapping, true);
-		//GoldrattRepairRecommendationSearch opt = new GoldrattRepairRecommendationSearch(net, initMarking, finalMarkings, log, costMOS, costMOT, mapping, true);
+		//GreedyGoldrattRepairRecommendationSearch opt = new GreedyGoldrattRepairRecommendationSearch(net, initMarking, finalMarkings, log, costMOS, costMOT, mapping, true);
+		GoldrattRepairRecommendationSearch opt = new GoldrattRepairRecommendationSearch(net, initMarking, finalMarkings, log, costMOS, costMOT, mapping, true);
 		
+		// SERIALIZE NET
+		opt.serializeNet("original");
 		
 		Set<String> labels = CostFunction.getLabels(net);
 		Map<String,Double> costFunc = CostFunction.getStdCostFunctionOnLabels(labels);  
-		RepairConstraint constraint = new RepairConstraint(costFunc,costFunc, 3);
+		RepairConstraint constraint = new RepairConstraint(costFunc,costFunc,9);
 		
 		Set<RepairRecommendation> recs = opt.computeOptimalRepairRecommendations(constraint);
 		
@@ -191,37 +186,12 @@ public class OptimalRepairRecommendationMain {
 		System.out.println(opt.getOptimalCost());
 		
 		// REPAIR NET
-		PetrinetRepair.repair(net, recs.iterator().next());
-		serializeNet(net, "repaired");
+		opt.repair(recs.iterator().next());
+		opt.serializeNet("repaired");
+		
+		PetrinetRepair.repair(net, log, recs.iterator().next());
 	}
 
-	private static void serializeNet(PetrinetGraph net, String name) throws IOException, SerializationException {
-		NetSystem n = new NetSystem();
-		
-		Map<PetrinetNode,org.jbpt.petri.Node> map = new HashMap<PetrinetNode,org.jbpt.petri.Node>();
-		for (Place p : net.getPlaces()) {
-			org.jbpt.petri.Place pp = new org.jbpt.petri.Place(p.getLabel());
-			map.put(p,pp);
-		}
-		
-		for (Place p : net.getPlaces()) {
-			org.jbpt.petri.Place pp = new org.jbpt.petri.Place(p.getLabel());
-			map.put(p,pp);
-		}
-		
-		for (Transition t : net.getTransitions()) {
-			org.jbpt.petri.Transition tt = new org.jbpt.petri.Transition(t.getLabel());
-			map.put(t,tt);
-		}
-		
-		for (PetrinetEdge<?,?> edge : net.getEdges()) {
-			if (edge.getSource() instanceof Place)
-				n.addFlow((org.jbpt.petri.Place) map.get(edge.getSource()),(org.jbpt.petri.Transition)map.get(edge.getTarget()));
-			else
-				n.addFlow((org.jbpt.petri.Transition) map.get(edge.getSource()),(org.jbpt.petri.Place)map.get(edge.getTarget()));
-		}
-		
-		org.jbpt.utils.IOUtils.toFile(name+".pnml", PNMLSerializer.serializePetriNet(n));
-	}
+	
 
 }
