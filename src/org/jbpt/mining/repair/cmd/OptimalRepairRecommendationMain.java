@@ -12,7 +12,6 @@ import org.deckfour.xes.info.impl.XLogInfoImpl;
 import org.deckfour.xes.model.XLog;
 import org.jbpt.mining.repair.CostFunction;
 import org.jbpt.mining.repair.GoldrattRepairRecommendationSearch;
-import org.jbpt.mining.repair.PetrinetRepair;
 import org.jbpt.mining.repair.RepairConstraint;
 import org.jbpt.mining.repair.RepairRecommendation;
 import org.jbpt.petri.Flow;
@@ -171,7 +170,7 @@ public class OptimalRepairRecommendationMain {
 		
 		Set<String> labels = CostFunction.getLabels(net);
 		Map<String,Double> costFunc = CostFunction.getStdCostFunctionOnLabels(labels);  
-		RepairConstraint constraint = new RepairConstraint(costFunc,costFunc,9);
+		RepairConstraint constraint = new RepairConstraint(costFunc,costFunc,3);
 		
 		Set<RepairRecommendation> recs = opt.computeOptimalRepairRecommendations(constraint);
 		
@@ -189,7 +188,10 @@ public class OptimalRepairRecommendationMain {
 		opt.repair(recs.iterator().next());
 		opt.serializeNet("repaired");
 		
-		PetrinetRepair.repair(net, log, recs.iterator().next());
+		/*RepairRecommendation rec = recs.iterator().next();
+		PetrinetRepair.repair(net, log, rec);*/
+		
+		//System.out.println(opt.computeFrequencies(costMOS, costMOT));
 	}
 
 	

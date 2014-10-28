@@ -13,13 +13,8 @@ import org.deckfour.xes.model.XLog;
 import org.processmining.models.graphbased.directed.petrinet.PetrinetGraph;
 import org.processmining.models.graphbased.directed.petrinet.elements.Transition;
 import org.processmining.models.semantics.petrinet.Marking;
-import org.processmining.plugins.astar.petrinet.manifestreplay.CostBasedCompleteManifestParam;
 import org.processmining.plugins.connectionfactories.logpetrinet.TransEvClassMapping;
-import org.processmining.plugins.petrinet.replayer.algorithms.IPNReplayParameter;
-import org.processmining.plugins.petrinet.replayer.algorithms.costbasedcomplete.CostBasedCompletePruneAlg;
-import org.processmining.plugins.petrinet.replayresult.PNRepResult;
 import org.processmining.plugins.petrinet.replayresult.StepTypes;
-import org.processmining.plugins.replayer.replayresult.SyncReplayResult;
 
 
 /**
@@ -271,7 +266,7 @@ public class GreedyGoldrattRepairRecommendationSearch extends RepairRecommendati
 		}
 	}
 	
-	public class AlignmentStep {
+	/*public class AlignmentStep {
 		public Object	 name = null;
 		public StepTypes type = null;
 		
@@ -294,37 +289,5 @@ public class GreedyGoldrattRepairRecommendationSearch extends RepairRecommendati
 			
 			return false;
 		}
-	}
-	
-	public Map<AlignmentStep,Integer> computeFrequencies(Map<Transition,Integer> t2c, Map<XEventClass,Integer> e2c) {
-		IPNReplayParameter parameters = new CostBasedCompleteManifestParam(e2c, t2c, 
-										this.initMarking, this.finalMarkings, this.maxNumOfStates, this.restrictedTrans);
-		parameters.setGUIMode(false);
-		
-		CostBasedCompletePruneAlg replayEngine = new CostBasedCompletePruneAlg();
-		
-		this.alignmentCostComputations += 1;
-		
-		PNRepResult result = replayEngine.replayLog(this.context, this.net, this.log, this.mapping, parameters);
-		
-		Map<AlignmentStep,Integer> map = new HashMap<AlignmentStep, Integer>();
-		for (SyncReplayResult res : result) {
-			for (int i=0; i<res.getNodeInstance().size(); i++) {
-				StepTypes type = res.getStepTypes().get(i);
-				if (type==StepTypes.LMGOOD) continue;
-				
-				AlignmentStep step = new AlignmentStep();
-				step.name = res.getNodeInstance().get(i);
-				step.type = type;
-				
-				Integer c = map.get(step);
-				if (c==null)
-					map.put(step,1);
-				else
-					map.put(step, map.get(step)+1);
-			}
-		}
-		
-		return map;
-	}
+	}*/
 }
