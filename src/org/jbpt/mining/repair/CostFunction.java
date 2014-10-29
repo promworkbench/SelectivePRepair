@@ -5,6 +5,11 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
+import org.deckfour.xes.classification.XEventClass;
+import org.deckfour.xes.classification.XEventClassifier;
+import org.deckfour.xes.info.XLogInfo;
+import org.deckfour.xes.info.XLogInfoFactory;
+import org.deckfour.xes.model.XLog;
 import org.processmining.models.graphbased.directed.petrinet.PetrinetGraph;
 import org.processmining.models.graphbased.directed.petrinet.elements.Transition;
 
@@ -20,25 +25,25 @@ public class CostFunction {
 		return result;
 	}
 
-	public static Map<String,Double> getStdCostFunctionOnLabels(Set<String> labels) {
-		Map<String, Double> result = new HashMap<String, Double>();
+	public static Map<String,Integer> getStdCostFunctionOnLabels(Set<String> labels) {
+		Map<String,Integer> result = new HashMap<String, Integer>();
 		
 		for (String label : labels)
-			result.put(label, 1.0);
+			result.put(label, 1);
 		
 		return result;
 	}
 	
-	public static double getRequiredResources(RepairConstraint constraint, RepairRecommendation recommendation) {
-		double result = 0.0;
+	public static int getRequiredResources(RepairConstraint constraint, RepairRecommendation recommendation) {
+		int result = 0;
 		
 		for (String label : recommendation.getInsertLabels()) {
-			Double ci = constraint.getInsertCosts().get(label);
+			Integer ci = constraint.getInsertCosts().get(label);
 			result += ci == null ? 0 : ci;
 		}
 		
 		for (String label : recommendation.getSkipLabels()) {
-			Double cs = constraint.getInsertCosts().get(label);
+			Integer cs = constraint.getInsertCosts().get(label);
 			result += cs == null ? 0 : cs;
 		}
 		
@@ -47,6 +52,17 @@ public class CostFunction {
 	
 	public static boolean isUnderBudget(RepairConstraint constraint, RepairRecommendation recommendation) {
 		return CostFunction.getRequiredResources(constraint, recommendation) <= constraint.getAvailableResources();
+	}
+
+	public static Set<String> getLabels(XLog log, XEventClassifier eventClassifier) {
+		Set<String> result = new HashSet<String>();
+		XLogInfo summary = XLogInfoFactory.createLogInfo(log,eventClassifier);
+		
+		for (XEventClass evClass : summary.getEventClasses().getClasses()) {
+			result.add(evClass.getId());
+		}
+		
+		return result;
 	}
 
 }

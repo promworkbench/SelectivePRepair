@@ -5,6 +5,7 @@ import java.util.Map;
 import java.util.Set;
 
 import org.deckfour.xes.classification.XEventClass;
+import org.deckfour.xes.classification.XEventClassifier;
 import org.deckfour.xes.model.XLog;
 import org.processmining.models.graphbased.directed.petrinet.PetrinetGraph;
 import org.processmining.models.graphbased.directed.petrinet.elements.Transition;
@@ -24,8 +25,9 @@ public class ImprovedBruteForceRepairRecommendationSearch extends RepairRecommen
 				Map<Transition,Integer>		costMOS, 
 				Map<XEventClass,Integer>	costMOT, 
 				TransEvClassMapping			mapping, 
-				boolean 					outputFlag) throws Exception {
-		super(net, initMarking, finalMarkings, log, costMOS, costMOT, mapping, outputFlag);
+				XEventClassifier			eventClassifier, 
+				boolean 					debug) throws Exception {
+		super(net, initMarking, finalMarkings, log, costMOS, costMOT, mapping, eventClassifier, debug);
 	}
 		
 	private Set<RepairRecommendation> visited = new HashSet<RepairRecommendation>();
@@ -51,7 +53,7 @@ public class ImprovedBruteForceRepairRecommendationSearch extends RepairRecommen
 			int cost = this.computeCost(tempMOS, tempMOT);
 			this.alignmentCostComputations++;
 			
-			if (this.outputFlag) {
+			if (this.debug) {
 				System.out.println(String.format("%s : %s", previousRecommendation, cost));
 				System.out.println(tempMOS);
 				System.out.println(tempMOT);
@@ -108,8 +110,8 @@ public class ImprovedBruteForceRepairRecommendationSearch extends RepairRecommen
 		
 		RepairRecommendation recommendation	= new RepairRecommendation();
 		
-		Set<String> labelsI = this.getLabels();
-		Set<String> labelsS = new HashSet<String>(labelsI);
+		Set<String> labelsI = CostFunction.getLabels(this.log,this.eventClassifier);
+		Set<String> labelsS = CostFunction.getLabels(this.net);
 		
 		this.computeOptimalRepairRecommendations(constraint, recommendation, recommendation, labelsI, labelsS, true);
 		

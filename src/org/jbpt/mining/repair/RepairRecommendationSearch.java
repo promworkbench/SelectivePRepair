@@ -11,6 +11,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import nl.tue.astar.AStarException;
 
 import org.deckfour.xes.classification.XEventClass;
+import org.deckfour.xes.classification.XEventClassifier;
 import org.deckfour.xes.model.XLog;
 import org.jbpt.petri.NetSystem;
 import org.jbpt.petri.Node;
@@ -18,15 +19,20 @@ import org.jbpt.petri.io.PNMLSerializer;
 import org.jbpt.throwable.SerializationException;
 import org.processmining.contexts.uitopia.DummyGlobalContext;
 import org.processmining.contexts.uitopia.DummyUIPluginContext;
+import org.processmining.models.graphbased.directed.DirectedGraphElement;
+import org.processmining.models.graphbased.directed.petrinet.Petrinet;
 import org.processmining.models.graphbased.directed.petrinet.PetrinetEdge;
 import org.processmining.models.graphbased.directed.petrinet.PetrinetGraph;
 import org.processmining.models.graphbased.directed.petrinet.PetrinetNode;
 import org.processmining.models.graphbased.directed.petrinet.elements.Place;
 import org.processmining.models.graphbased.directed.petrinet.elements.Transition;
+import org.processmining.models.graphbased.directed.petrinet.impl.PetrinetFactory;
 import org.processmining.models.semantics.petrinet.Marking;
+import org.processmining.plugins.astar.petrinet.PetrinetReplayerWithILP;
 import org.processmining.plugins.astar.petrinet.manifestreplay.CostBasedCompleteManifestParam;
 import org.processmining.plugins.connectionfactories.logpetrinet.TransEvClassMapping;
 import org.processmining.plugins.petrinet.replayer.algorithms.IPNReplayParameter;
+import org.processmining.plugins.petrinet.replayer.algorithms.costbasedcomplete.CostBasedCompleteParam;
 import org.processmining.plugins.petrinet.replayer.algorithms.costbasedcomplete.CostBasedCompletePruneAlg;
 import org.processmining.plugins.petrinet.replayer.matchinstances.algorithms.express.AllOptAlignmentsGraphAlg;
 import org.processmining.plugins.petrinet.replayresult.PNMatchInstancesRepResult;
@@ -45,6 +51,8 @@ public abstract class RepairRecommendationSearch {
 	protected Marking		initMarking		= null; // initial marking
 	protected Marking[]		finalMarkings	= null; // set of final markings
 	
+	protected XEventClassifier eventClassifier = null;
+	
 	protected DummyUIPluginContext 		context			= null;
 	protected TransEvClassMapping		mapping			= null;
 	
@@ -58,7 +66,7 @@ public abstract class RepairRecommendationSearch {
 	protected int optimalCost = Integer.MAX_VALUE;
 	protected Set<RepairRecommendation> optimalRepairRecommendations = null;
 	
-	protected boolean outputFlag = false;
+	protected boolean debug = false;
 	
 	protected RepairRecommendationSearch(
 			PetrinetGraph	net, 
@@ -68,11 +76,14 @@ public abstract class RepairRecommendationSearch {
 			Map<Transition,Integer>		costMOS, 
 			Map<XEventClass,Integer>	costMOT, 
 			TransEvClassMapping			mapping, 
-			boolean 					outputFlag) throws Exception {
+			XEventClassifier eventClassifier, 
+			boolean debug) throws Exception {
 		
 		if (net==null) return;
 		
 		this.context 			= new DummyUIPluginContext(new DummyGlobalContext(), "label");
+		
+		this.eventClassifier	= eventClassifier;
 		
 		this.optimalRepairRecommendations = new HashSet<RepairRecommendation>();
 		
@@ -84,7 +95,7 @@ public abstract class RepairRecommendationSearch {
 		this.costFuncMOS		= costMOS;
 		this.costFuncMOT		= costMOT;
 		this.mapping			= mapping;
-		this.outputFlag			= outputFlag;
+		this.debug				= debug;
 		
 		this.restrictedTrans = new HashSet<Transition>();
 		
@@ -96,26 +107,6 @@ public abstract class RepairRecommendationSearch {
 	
 	public int computeCost() {
 		return this.computeCost(this.costFuncMOS,this.costFuncMOT);
-	}
-	
-	public int computeCost(Map<Transition,Integer> costMOS, Map<XEventClass,Integer> costMOT) {
-		IPNReplayParameter parameters = new CostBasedCompleteManifestParam(costMOT, costMOS, 
-										this.initMarking, this.finalMarkings, this.maxNumOfStates, this.restrictedTrans);
-		parameters.setGUIMode(false);
-		
-		CostBasedCompletePruneAlg replayEngine = new CostBasedCompletePruneAlg();
-		PNRepResult result = replayEngine.replayLog(this.context, this.net, this.log, this.mapping, parameters);
-		
-		int cost = 0;
-		int count = 0;
-		for (SyncReplayResult res : result) {
-			cost += res.getInfo().get("Raw Fitness Cost");
-			count++;
-		}
-		
-		System.out.println(count);
-		
-		return cost;
 	}
 	
 	public int getNumberOfAlignmentCostComputations() {
@@ -231,7 +222,7 @@ public abstract class RepairRecommendationSearch {
 		}
 	}
 	
-	protected Set<String> getLabels() {
+/*	protected Set<String> getLabels() {
 		Set<String> result = CostFunction.getLabels(this.net);
 		
 		for (XEventClass event : this.costFuncMOT.keySet()) {
@@ -239,13 +230,10 @@ public abstract class RepairRecommendationSearch {
 		}
 		
 		return result;
-	}
+	}*/
 	
-	public void repair(RepairRecommendation rec) {
-		
-		System.out.println("----------------------------");
-		System.out.println(" START PROCESS MODEL REPAIR ");
-		System.out.println("----------------------------");
+	public PetrinetGraph repair(RepairRecommendation rec) {
+		if (debug) System.out.println("DEBUG> Start process model repair");
 		
 		Map<Transition,Integer>  tempMOS	= new HashMap<Transition,Integer>(this.costFuncMOS);
 		Map<XEventClass,Integer> tempMOT	= new HashMap<XEventClass,Integer>(this.costFuncMOT);
@@ -260,7 +248,7 @@ public abstract class RepairRecommendationSearch {
 		CostBasedCompletePruneAlg replayEngine = new CostBasedCompletePruneAlg();
 
 		PNRepResult result = replayEngine.replayLog(this.context, this.net, this.log, this.mapping, parameters);
-
+	
 		// REPAIR MOVES ON MODEL (skip labels)
 		Set<Object> toSkip = new HashSet<Object>();
 		if (!rec.getSkipLabels().isEmpty()) { 
@@ -275,24 +263,20 @@ public abstract class RepairRecommendationSearch {
 			}	
 		}
 		
-		// TODO this is debug code
-		for (Transition t: this.net.getTransitions()) {
-			if (rec.getSkipLabels().contains(t.getLabel()))
-				toSkip.add(t);
-		}
-		System.out.println("SKIP: "+toSkip);
+		if (debug) System.out.println("DEBUG> Skip transitions: "+toSkip);
 		
 		// REPAIR MOVES ON TRACE (insert labels)
 		Map<String,Set<Set<org.jbpt.petri.Place>>> labels2markings = new HashMap<String,Set<Set<org.jbpt.petri.Place>>>();
-		Map<PetrinetNode,org.jbpt.petri.Node> map = new HashMap<PetrinetNode,org.jbpt.petri.Node>();
-		Map<org.jbpt.petri.Node,PetrinetNode> map2 = new HashMap<org.jbpt.petri.Node,PetrinetNode>();
-		NetSystem sys = this.constructNetSystem(map,map2);
+		Map<PetrinetNode,org.jbpt.petri.Node> mapX = new HashMap<PetrinetNode,org.jbpt.petri.Node>();
+		Map<org.jbpt.petri.Node,PetrinetNode> mapY = new HashMap<org.jbpt.petri.Node,PetrinetNode>();
+		
+		NetSystem sys = this.constructNetSystem(this.net,mapX,mapY);
 		
 		org.jbpt.petri.Place start = sys.getSourcePlaces().iterator().next();
 		org.jbpt.petri.Place end = sys.getSinkPlaces().iterator().next();
 		
 		for (SyncReplayResult res : result) {
-			this.loadInitialMarking(sys, map);
+			this.loadInitialMarking(sys, mapX);
 			
 			for (int i=0; i<res.getStepTypes().size(); i++) {
 				StepTypes type = res.getStepTypes().get(i);
@@ -312,27 +296,22 @@ public abstract class RepairRecommendationSearch {
 				}
 				else {
 					Transition t = (Transition) res.getNodeInstance().get(i);
-					org.jbpt.petri.Transition tt = (org.jbpt.petri.Transition) map.get(t);
+					org.jbpt.petri.Transition tt = (org.jbpt.petri.Transition) mapX.get(t);
 					sys.fire(tt);
 				}				
 			}
-			
-			/*System.out.println(res.getNodeInstance());
-			System.out.println(res.getNodeInstance().size());
-			System.out.println(res.getStepTypes());
-			System.out.println(res.getStepTypes().size());
-			System.out.println("----");*/
 		}
 		
-		// TODO this can be optimized
-		System.out.println(labels2markings);
+		if (debug) System.out.println("DEBUG> MOT at markings: "+labels2markings);
+		
+		// TODO this must be optimized
 		Map<String,Set<org.jbpt.petri.Place>> labels2places = new HashMap<String,Set<org.jbpt.petri.Place>>();
 		
 		for (Map.Entry<String,Set<Set<org.jbpt.petri.Place>>> entry : labels2markings.entrySet()) {
 			Set<org.jbpt.petri.Place> places = new HashSet<org.jbpt.petri.Place>();
 			Set<org.jbpt.petri.Place> ps = new HashSet<org.jbpt.petri.Place>();
 			for (Set<org.jbpt.petri.Place> m : entry.getValue()) places.addAll(m);
-			Set<org.jbpt.petri.Place> places2 = new HashSet<org.jbpt.petri.Place>(places);
+			//Set<org.jbpt.petri.Place> places2 = new HashSet<org.jbpt.petri.Place>(places);
 			
 			Set<Set<org.jbpt.petri.Place>> ms = new HashSet<Set<org.jbpt.petri.Place>>(entry.getValue());
 			while (!ms.isEmpty()) {
@@ -362,69 +341,62 @@ public abstract class RepairRecommendationSearch {
 				ms.removeAll(toRemove);
 			}
 			
-			labels2places.put(entry.getKey(),ps); // TODO should be ps instead of places2
+			labels2places.put(entry.getKey(),ps);
 		}
 		
-		System.out.println(labels2places);
+		if (debug) System.out.println("DEBUG> Insert labels at places: "+labels2places);
 		
 		boolean newStart = true;
 		boolean newEnd = true;
 		
-		// add inserts
+		Map<DirectedGraphElement,DirectedGraphElement> map = new HashMap<DirectedGraphElement,DirectedGraphElement>();
+		PetrinetGraph netCopy = PetrinetFactory.clonePetrinet((Petrinet) net,map);
+		
+		// insert labels
 		for (Map.Entry<String,Set<org.jbpt.petri.Place>> entry : labels2places.entrySet()) {
 			for (org.jbpt.petri.Place p : entry.getValue()) {
-				Transition tt = this.net.addTransition(entry.getKey());
-				Place pp = (Place) map2.get(p);
-				this.net.addArc(pp, tt);
-				this.net.addArc(tt, pp);
+				Transition tt = netCopy.addTransition(entry.getKey());
+				Place pp = (Place) map.get(mapY.get(p));
+				netCopy.addArc(pp, tt);
+				netCopy.addArc(tt, pp);
 				
 				if (p.equals(start) && newStart) {
-					Transition ttt = this.net.addTransition("invisible");
-					Place ppp = this.net.addPlace("");
-					this.net.addArc(ppp, ttt);
-					this.net.addArc(ttt, pp);
+					Transition ttt = netCopy.addTransition("");
+					Place ppp = netCopy.addPlace("");
+					netCopy.addArc(ppp, ttt);
+					netCopy.addArc(ttt, pp);
 					newStart = false;
 				}
 				
 				if (p.equals(end) && newEnd) {
-					Transition ttt = this.net.addTransition("invisible");
-					Place ppp = this.net.addPlace("");
-					this.net.addArc(pp, ttt);
-					this.net.addArc(ttt, ppp);
+					Transition ttt = netCopy.addTransition("");
+					Place ppp = netCopy.addPlace("");
+					netCopy.addArc(pp, ttt);
+					netCopy.addArc(ttt, ppp);
 					newEnd = false;
-				}
-				
+				}	
 			}
 		}
 		
-		// add skips
+		// skip labels
 		for (Object o : toSkip) {
 			Transition t = (Transition) o;
 			
-			Transition tt = this.net.addTransition("invisible");
+			Transition tt = netCopy.addTransition("");
 			tt.setInvisible(true);
 			
-			for (PetrinetEdge<?,?> edge : this.net.getInEdges(t)) {
-				this.net.addArc((Place)edge.getSource(), tt);
+			for (PetrinetEdge<?,?> edge : netCopy.getInEdges((Transition)map.get(t))) {
+				netCopy.addArc((Place)edge.getSource(), tt);
 			}
 			
-			for (PetrinetEdge<?,?> edge : this.net.getOutEdges(t)) {
-				this.net.addArc(tt,(Place)edge.getTarget());
+			for (PetrinetEdge<?,?> edge : netCopy.getOutEdges((Transition)map.get(t))) {
+				netCopy.addArc(tt,(Place)edge.getTarget());
 			}
 		}
 		
-		// TODO overhead!
-		/*for (Place p : this.net.getPlaces()) {
-			if (this.net.getInEdges(p).isEmpty() || this.net.getOutEdges(p).isEmpty()) continue;
-			
-			for (String label : rec.getInsertLabels()) {
-				Transition tt = this.net.addTransition(label);
-				this.net.addArc(p, tt);
-				this.net.addArc(tt, p);
-			}
-		}*/
+		if (debug) System.out.println("DEBUG> Finish process model repair");
 		
-		System.out.println("----------------------------");
+		return netCopy;
 	}
 	
 	private void loadInitialMarking(NetSystem sys, Map<PetrinetNode, Node> map) {
@@ -434,41 +406,102 @@ public abstract class RepairRecommendationSearch {
 			sys.putTokens((org.jbpt.petri.Place) map.get(p), Collections.frequency(this.initMarking, p));
 	}
 
-	private NetSystem constructNetSystem(Map<PetrinetNode,org.jbpt.petri.Node> map, Map<Node, PetrinetNode> map2) {
+	private NetSystem constructNetSystem(PetrinetGraph pn, Map<PetrinetNode,org.jbpt.petri.Node> mapX, Map<Node, PetrinetNode> mapY) 
+	{
 		NetSystem n = new NetSystem();
 		
-		for (Place p : net.getPlaces()) {
+		for (Place p : pn.getPlaces()) {
 			org.jbpt.petri.Place pp = new org.jbpt.petri.Place(p.getLabel());
-			map.put(p,pp);
-			map2.put(pp,p);
+			mapX.put(p,pp);
+			mapY.put(pp,p);
 		}
 		
-		for (Place p : net.getPlaces()) {
+		for (Place p : pn.getPlaces()) {
 			org.jbpt.petri.Place pp = new org.jbpt.petri.Place(p.getLabel());
-			map.put(p,pp);
-			map2.put(pp,p);
+			mapX.put(p,pp);
+			mapY.put(pp,p);
 		}
 		
-		for (Transition t : net.getTransitions()) {
+		for (Transition t : pn.getTransitions()) {
 			org.jbpt.petri.Transition tt = new org.jbpt.petri.Transition(t.getLabel());
-			map.put(t,tt);
-			map2.put(tt,t);
+			mapX.put(t,tt);
+			mapY.put(tt,t);
 		}
 		
-		for (PetrinetEdge<?,?> edge : net.getEdges()) {
+		for (PetrinetEdge<?,?> edge : pn.getEdges()) {
 			if (edge.getSource() instanceof Place)
-				n.addFlow((org.jbpt.petri.Place) map.get(edge.getSource()),(org.jbpt.petri.Transition)map.get(edge.getTarget()));
+				n.addFlow((org.jbpt.petri.Place) mapX.get(edge.getSource()),(org.jbpt.petri.Transition)mapX.get(edge.getTarget()));
 			else
-				n.addFlow((org.jbpt.petri.Transition) map.get(edge.getSource()),(org.jbpt.petri.Place)map.get(edge.getTarget()));
+				n.addFlow((org.jbpt.petri.Transition) mapX.get(edge.getSource()),(org.jbpt.petri.Place)mapX.get(edge.getTarget()));
+		}
+		
+		for (org.jbpt.petri.Place p : n.getPlaces()) {
+			if (n.getIncomingEdges(p).isEmpty())
+				n.putTokens(p,1);
 		}
 		
 		return n;
 	}
 	
-	public void serializeNet(String name) throws SerializationException {
-		NetSystem n = this.constructNetSystem(new HashMap<PetrinetNode,org.jbpt.petri.Node>(), new HashMap<org.jbpt.petri.Node,PetrinetNode>());
+	public void serializeNet(PetrinetGraph pn, String name) throws SerializationException {
+		NetSystem n = this.constructNetSystem(pn, new HashMap<PetrinetNode,org.jbpt.petri.Node>(), new HashMap<org.jbpt.petri.Node,PetrinetNode>());
 		
-		org.jbpt.utils.IOUtils.toFile(name+".pnml", PNMLSerializer.serializePetriNet(n));
+		org.jbpt.utils.IOUtils.toFile(name, PNMLSerializer.serializePetriNet(n));
+	}
+	
+	/*public int computeCost(Map<Transition,Integer> costMOS, Map<XEventClass,Integer> costMOT) {
+		IPNReplayParameter parameters = new CostBasedCompleteManifestParam(costMOT, costMOS, 
+										this.initMarking, this.finalMarkings, this.maxNumOfStates, this.restrictedTrans);
+		parameters.setGUIMode(false);
+		
+		CostBasedCompletePruneAlg replayEngine = new CostBasedCompletePruneAlg();
+		PNRepResult result = replayEngine.replayLog(this.context, this.net, this.log, this.mapping, parameters);
+		
+		int cost = 0;
+		for (SyncReplayResult res : result) {
+			cost += res.getInfo().get("Raw Fitness Cost");
+		}
+		
+		this.alignmentCostComputations++;
+		
+		return cost;
+	}*/
+	
+	public int computeCost(Map<Transition,Integer> costMOS, Map<XEventClass,Integer> costMOT) {
+		PetrinetReplayerWithILP replayEngine = new PetrinetReplayerWithILP();
+		
+		//AllOptAlignmentsGraphAlg replayEngine = new AllOptAlignmentsGraphAlg();
+		//AllOptAlignmentsGraphILPAlg replayEngine = new AllOptAlignmentsGraphILPAlg();
+		//AllOptAlignmentsTreeAlg replayEngine = new AllOptAlignmentsTreeAlg();
+		//CostBasedCompletePruneAlg replayEngine = new CostBasedCompletePruneAlg();
+		
+		IPNReplayParameter parameters = new CostBasedCompleteParam(costMOT,costMOS);
+		parameters.setInitialMarking(this.initMarking);
+		parameters.setFinalMarkings(this.finalMarkings[0]);
+		parameters.setGUIMode(false);
+		parameters.setCreateConn(false);
+		
+		/*Object[] parameters = new Object[3];
+		parameters[0] = costMOS;
+		parameters[2] = costMOT;
+		parameters[1] = Integer.MAX_VALUE;*/
+				
+		int cost = 0;
+		try {
+			PNRepResult result;
+			result = replayEngine.replayLog(context, net, log, mapping, parameters);
+			
+			for (SyncReplayResult res : result) {
+				cost += res.getInfo().get("Raw Fitness Cost") * res.getTraceIndex().size();
+			}
+		} catch (AStarException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
+		this.alignmentCostComputations++;
+		
+		return cost;
 	}
 	
 	public Map<AlignmentStep,Integer> computeFrequencies(Map<Transition,Integer> t2c, Map<XEventClass,Integer> e2c) {
@@ -531,7 +564,7 @@ public abstract class RepairRecommendationSearch {
 	
 	/*public Map<AlignmentStep,Integer> computeFrequencies(Map<Transition,Integer> t2c, Map<XEventClass,Integer> e2c) {		
 		IPNReplayParameter parameters = new CostBasedCompleteManifestParam(e2c, t2c, 
-										this.initMarking, this.finalMarkings, this.maxNumOfStates, this.restrictedTrans);
+					this.initMarking, this.finalMarkings, this.maxNumOfStates, this.restrictedTrans);
 		parameters.setGUIMode(false);
 		
 		CostBasedCompletePruneAlg replayEngine = new CostBasedCompletePruneAlg();

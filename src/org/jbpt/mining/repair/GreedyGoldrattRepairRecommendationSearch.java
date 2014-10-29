@@ -9,6 +9,7 @@ import java.util.Map;
 import java.util.Set;
 
 import org.deckfour.xes.classification.XEventClass;
+import org.deckfour.xes.classification.XEventClassifier;
 import org.deckfour.xes.model.XLog;
 import org.processmining.models.graphbased.directed.petrinet.PetrinetGraph;
 import org.processmining.models.graphbased.directed.petrinet.elements.Transition;
@@ -28,9 +29,10 @@ public class GreedyGoldrattRepairRecommendationSearch extends RepairRecommendati
 				XLog 			log, 
 				Map<Transition,Integer>		costMOS, 
 				Map<XEventClass,Integer>	costMOT, 
-				TransEvClassMapping			mapping, 
-				boolean 					outputFlag) throws Exception {
-		super(net, initMarking, finalMarkings, log, costMOS, costMOT, mapping, outputFlag);
+				TransEvClassMapping			mapping,
+				XEventClassifier		 	eventClassifier,
+				boolean 					debug) throws Exception {
+		super(net, initMarking, finalMarkings, log, costMOS, costMOT, mapping, eventClassifier, debug);
 	}
 		
 	Map<String,Integer> costFuncMOSwL = new HashMap<String,Integer>();

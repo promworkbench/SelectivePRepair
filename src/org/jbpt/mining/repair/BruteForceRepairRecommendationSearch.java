@@ -5,6 +5,7 @@ import java.util.Map;
 import java.util.Set;
 
 import org.deckfour.xes.classification.XEventClass;
+import org.deckfour.xes.classification.XEventClassifier;
 import org.deckfour.xes.model.XLog;
 import org.processmining.models.graphbased.directed.petrinet.PetrinetGraph;
 import org.processmining.models.graphbased.directed.petrinet.elements.Transition;
@@ -17,15 +18,17 @@ import org.processmining.plugins.connectionfactories.logpetrinet.TransEvClassMap
  */
 public class BruteForceRepairRecommendationSearch extends RepairRecommendationSearch {
 	
-		public BruteForceRepairRecommendationSearch(PetrinetGraph	net, 
+		public BruteForceRepairRecommendationSearch(
+				PetrinetGraph net, 
 				Marking			initMarking, 
 				Marking[]		finalMarkings, 
 				XLog 			log, 
 				Map<Transition,Integer>		costMOS, 
 				Map<XEventClass,Integer>	costMOT, 
 				TransEvClassMapping			mapping, 
-				boolean 					outputFlag) throws Exception {
-		super(net, initMarking, finalMarkings, log, costMOS, costMOT, mapping, outputFlag);
+				XEventClassifier eventClassifier, 
+				boolean debug) throws Exception {
+		super(net, initMarking, finalMarkings, log, costMOS, costMOT, mapping, eventClassifier, debug);
 	}
 		
 	private Set<RepairRecommendation> visited = new HashSet<RepairRecommendation>(); 
@@ -46,14 +49,8 @@ public class BruteForceRepairRecommendationSearch extends RepairRecommendationSe
 		
 		// compute cost
 		int cost = this.computeCost(tempMOS, tempMOT);
-		this.alignmentCostComputations++;
 		
-		if (this.outputFlag) {
-			System.out.println(String.format("%s : %s", recommendation, cost));
-			System.out.println(tempMOS);
-			System.out.println(tempMOT);
-			System.out.println("-----");
-		}
+		if (this.debug) System.out.println(String.format("DEBUG> %s : %s", recommendation, cost));
 		
 		// update optimal cost
 		if (cost < this.optimalCost) {
@@ -99,8 +96,8 @@ public class BruteForceRepairRecommendationSearch extends RepairRecommendationSe
 		
 		RepairRecommendation recommendation	= new RepairRecommendation();
 		
-		Set<String> labelsI = this.getLabels();
-		Set<String> labelsS = new HashSet<String>(labelsI);
+		Set<String> labelsI = CostFunction.getLabels(this.log,this.eventClassifier);
+		Set<String> labelsS = CostFunction.getLabels(this.net);
 		
 		this.computeOptimalRepairRecommendations(constraint, recommendation, labelsI, labelsS);
 		

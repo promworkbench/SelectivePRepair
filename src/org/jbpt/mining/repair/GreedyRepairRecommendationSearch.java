@@ -5,6 +5,7 @@ import java.util.Map;
 import java.util.Set;
 
 import org.deckfour.xes.classification.XEventClass;
+import org.deckfour.xes.classification.XEventClassifier;
 import org.deckfour.xes.model.XLog;
 import org.processmining.models.graphbased.directed.petrinet.PetrinetGraph;
 import org.processmining.models.graphbased.directed.petrinet.elements.Transition;
@@ -24,8 +25,9 @@ public class GreedyRepairRecommendationSearch extends RepairRecommendationSearch
 				Map<Transition,Integer>		costMOS, 
 				Map<XEventClass,Integer>	costMOT, 
 				TransEvClassMapping			mapping, 
-				boolean 					outputFlag) throws Exception {
-		super(net, initMarking, finalMarkings, log, costMOS, costMOT, mapping, outputFlag);
+				XEventClassifier 			eventClassifier,
+				boolean 					debug) throws Exception {
+		super(net, initMarking, finalMarkings, log, costMOS, costMOT, mapping, eventClassifier, debug);
 	}
 
 	@Override
@@ -38,7 +40,8 @@ public class GreedyRepairRecommendationSearch extends RepairRecommendationSearch
 		this.alignmentCostComputations++;
 		
 		// the set of all labels
-		Set<String> labels = this.getLabels();
+		Set<String> labels = CostFunction.getLabels(this.net);
+		labels.addAll(CostFunction.getLabels(this.log, this.eventClassifier));
 		
 		// empty recommendation to start with
 		Set<RepairRecommendation> recs = new HashSet<RepairRecommendation>();
