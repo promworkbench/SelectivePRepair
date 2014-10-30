@@ -18,10 +18,14 @@ import org.processmining.plugins.petrinet.replayresult.StepTypes;
 
 /**
  * @author Artem Polyvyanyy
+ * 
+ * TODO: check if all optimal alignments are considered
+ * TODO: weighted frequencies, based on the number of optimal alignments
  */
 public class GoldrattRepairRecommendationSearch extends RepairRecommendationSearch {
 	
-		public GoldrattRepairRecommendationSearch(PetrinetGraph	net, 
+		public GoldrattRepairRecommendationSearch(
+				PetrinetGraph	net, 
 				Marking			initMarking, 
 				Marking[]		finalMarkings, 
 				XLog 			log, 
@@ -43,11 +47,9 @@ public class GoldrattRepairRecommendationSearch extends RepairRecommendationSear
 		this.alignmentCostComputations	= 0;
 		this.optimalRepairRecommendations.clear();
 		
-		// get misalignment frequencies
-		// TODO: check if all optimal alignments are considered
-		// TODO: weighted frequencies, based on the number of optimal alignments 
+		// get movement frequencies 
 		Map<AlignmentStep,Integer> frequencies = this.computeFrequencies(this.costFuncMOS, this.costFuncMOT);
-		System.out.println("FREQUENCIES:" + frequencies);
+		if (debug) System.out.println("DEBUG> Movement frequencies:" + frequencies);
 		
 		Map<Transition,Integer>	 costFuncMOSw = new HashMap<Transition, Integer>();
 		Map<XEventClass,Integer> costFuncMOTw = new HashMap<XEventClass, Integer>();
@@ -152,12 +154,11 @@ public class GoldrattRepairRecommendationSearch extends RepairRecommendationSear
         	Label lb = labels.get(n-1);
         	if (lb.isTransition) {
         		profit[n] = costFuncMOSwL.get(lb.label);
-        		double d = ((double) constraint.getSkipCosts().get(lb.label));
-                weight[n] = (int) d;															// TODO	
+                weight[n] = constraint.getSkipCosts().get(lb.label);	
         	}
         	else {
         		profit[n] = costFuncMOTwL.get(lb.label);
-                weight[n] = (int)((double) constraint.getInsertCosts().get(lb.label));			// TODO
+                weight[n] = constraint.getInsertCosts().get(lb.label);
         	}
         }
         

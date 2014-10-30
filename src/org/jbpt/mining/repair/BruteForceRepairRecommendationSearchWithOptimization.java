@@ -12,13 +12,13 @@ import org.processmining.models.graphbased.directed.petrinet.elements.Transition
 import org.processmining.models.semantics.petrinet.Marking;
 import org.processmining.plugins.connectionfactories.logpetrinet.TransEvClassMapping;
 
-
 /**
  * @author Artem Polyvyanyy
  */
-public class ImprovedBruteForceRepairRecommendationSearch extends RepairRecommendationSearch {
+public class BruteForceRepairRecommendationSearchWithOptimization extends RepairRecommendationSearch {
 	
-		public ImprovedBruteForceRepairRecommendationSearch(PetrinetGraph	net, 
+		public BruteForceRepairRecommendationSearchWithOptimization(
+				PetrinetGraph	net, 
 				Marking			initMarking, 
 				Marking[]		finalMarkings, 
 				XLog 			log, 
@@ -51,15 +51,8 @@ public class ImprovedBruteForceRepairRecommendationSearch extends RepairRecommen
 			
 			// compute cost
 			int cost = this.computeCost(tempMOS, tempMOT);
-			this.alignmentCostComputations++;
 			
-			if (this.debug) {
-				System.out.println(String.format("%s : %s", previousRecommendation, cost));
-				System.out.println(tempMOS);
-				System.out.println(tempMOT);
-				System.out.println(this.alignmentCostComputations);
-				System.out.println("-----");
-			}
+			if (this.debug) System.out.println(String.format("DEBUG> %s : %s", recommendation, cost));
 			
 			// update optimal cost
 			if (cost < this.optimalCost) {

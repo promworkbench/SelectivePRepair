@@ -1,8 +1,10 @@
 package org.jbpt.mining.repair.main;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -13,7 +15,9 @@ import org.deckfour.xes.info.XLogInfoFactory;
 import org.deckfour.xes.info.impl.XLogInfoImpl;
 import org.deckfour.xes.model.XLog;
 import org.jbpt.mining.repair.BruteForceRepairRecommendationSearch;
+import org.jbpt.mining.repair.BruteForceRepairRecommendationSearchWithOptimization;
 import org.jbpt.mining.repair.CostFunction;
+import org.jbpt.mining.repair.GreedyRepairRecommendationSearch;
 import org.jbpt.mining.repair.RepairConstraint;
 import org.jbpt.mining.repair.RepairRecommendation;
 import org.jbpt.mining.repair.RepairRecommendationSearch;
@@ -34,7 +38,7 @@ import ee.ut.prom.XLogReader;
  */
 public class RepairRecommendationSearchExp {
 	
-	private enum RR_SEARCH_ALGORITHM {BF,BF2};
+	private enum RR_SEARCH_ALGORITHM {BF,BF2,GREEDY};
 	
 	//private static XEventClassifier eventClassifier = XLogInfoImpl.STANDARD_CLASSIFIER;
 	private static XEventClassifier eventClassifier = XLogInfoImpl.NAME_CLASSIFIER;
@@ -42,13 +46,15 @@ public class RepairRecommendationSearchExp {
 	public static void main(String[] args) throws Exception {
 		// configuration
 		Map<String,Set<String>> log2nets = new HashMap<String,Set<String>>();
-		Set<RR_SEARCH_ALGORITHM> algs = new HashSet<RR_SEARCH_ALGORITHM>();
+		List<RR_SEARCH_ALGORITHM> algs = new ArrayList<RR_SEARCH_ALGORITHM>();
 		
 		Set<String> aoNets = new HashSet<String>();
 		aoNets.add("AO");
 		log2nets.put("AO", aoNets);
 		
-		algs.add(RR_SEARCH_ALGORITHM.BF);
+		algs.add(RR_SEARCH_ALGORITHM.GREEDY);
+		//algs.add(RR_SEARCH_ALGORITHM.BF2);
+		//algs.add(RR_SEARCH_ALGORITHM.BF);
 		
 		// preparation
 		RepairRecommendationSearch rrSearch = null;
@@ -59,19 +65,17 @@ public class RepairRecommendationSearchExp {
 		Map<Transition,Integer>  costMOS = null; // movements on system
 		Map<XEventClass,Integer> costMOT = null; // movements on trace
 		TransEvClassMapping mapping = null;
-		boolean debug = false;
-		int maxRepairResources = 1;
+		boolean debug = true;
+		int maxRepairResources = 8;
 		
 		// experiment
 		for (Map.Entry<String,Set<String>> entry : log2nets.entrySet()) {
 			String logFile = entry.getKey();
 			for (String netFile : entry.getValue()) {				
 				for (int res=0; res<=maxRepairResources; res++) {
-					
-					// perform brute-force search
-					if (algs.contains(RR_SEARCH_ALGORITHM.BF)) {
+					for (RR_SEARCH_ALGORITHM alg : algs) {
 						System.out.println("----------------------------------------");
-						System.out.println("Start brute-force repair...");
+						System.out.println(String.format("Start %s repair...", alg));
 						System.out.println("Log file: "+logFile);
 						System.out.println("Net file: "+netFile);
 						
@@ -89,7 +93,18 @@ public class RepairRecommendationSearchExp {
 						System.out.println("MOS costs: "+costMOS);
 						System.out.println("MOT costs: "+costMOT);
 						
-						rrSearch = new BruteForceRepairRecommendationSearch(net, initialMarking, finalMarkings, log, costMOS, costMOT, mapping, eventClassifier, debug);
+						switch (alg) {
+							case BF : 
+								rrSearch = new BruteForceRepairRecommendationSearch(net, initialMarking, finalMarkings, log, costMOS, costMOT, mapping, eventClassifier, debug);
+								break;
+							case BF2:
+								rrSearch = new BruteForceRepairRecommendationSearchWithOptimization(net, initialMarking, finalMarkings, log, costMOS, costMOT, mapping, eventClassifier, debug);
+								break;
+							case GREEDY:
+								rrSearch = new GreedyRepairRecommendationSearch(net, initialMarking, finalMarkings, log, costMOS, costMOT, mapping, eventClassifier, debug);
+								break;
+						}
+						
 						
 						//String originalName = String.format("exp/%s.BEFORE.pnml",netFile);
 						//rrSearch.serializeNet(net,originalName);
@@ -118,7 +133,7 @@ public class RepairRecommendationSearchExp {
 						
 						int count = 0;
 						for (RepairRecommendation rec : recs) {
-							String repairedName = String.format("exp/%s.%s.%s.%s.%s.REPAIRED.pnml",netFile,logFile,res,count,rrSearch.getOptimalCost());
+							String repairedName = String.format("exp/%s.%s.%s.%s.%s.%s.REPAIRED.pnml",netFile,logFile,res,count,rrSearch.getOptimalCost(),alg);
 							
 							PetrinetGraph repaired = rrSearch.repair(rec);
 							rrSearch.serializeNet(repaired,repairedName);

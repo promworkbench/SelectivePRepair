@@ -15,6 +15,8 @@ import org.processmining.plugins.connectionfactories.logpetrinet.TransEvClassMap
 
 /**
  * @author Artem Polyvyanyy
+ * 
+ * TODO: think of a stopping condition once all expansions of a repair recommendation do not lead to alignment improvement
  */
 public class GreedyRepairRecommendationSearch extends RepairRecommendationSearch {
 	
@@ -37,11 +39,13 @@ public class GreedyRepairRecommendationSearch extends RepairRecommendationSearch
 				
 		// cost of alignment to start with
 		this.optimalCost = this.computeCost(this.costFuncMOS, this.costFuncMOT);
-		this.alignmentCostComputations++;
 		
-		// the set of all labels
-		Set<String> labels = CostFunction.getLabels(this.net);
-		labels.addAll(CostFunction.getLabels(this.log, this.eventClassifier));
+		/* OLD:
+		 * Set<String> labels = CostFunction.getLabels(this.log,this.eventClassifier);
+		labels.addAll(CostFunction.getLabels(this.net));*/
+		
+		Set<String> labelsI = CostFunction.getLabels(this.log,this.eventClassifier);
+		Set<String> labelsS = CostFunction.getLabels(this.net);
 		
 		// empty recommendation to start with
 		Set<RepairRecommendation> recs = new HashSet<RepairRecommendation>();
@@ -49,14 +53,14 @@ public class GreedyRepairRecommendationSearch extends RepairRecommendationSearch
 		recs.add(recommendation);
 		
 		do {
-			System.out.println(this.alignmentCostComputations);
+			if (debug) System.out.println("DEBUG> Alignment computations: "+this.alignmentCostComputations);
 			this.optimalRepairRecommendations.clear();
 			this.optimalRepairRecommendations.addAll(recs);
 			recs.clear();
 			
 			for (RepairRecommendation r : this.optimalRepairRecommendations) {
 				// handle insert labels
-				Set<String> ls = new HashSet<String>(labels);
+				Set<String> ls = new HashSet<String>(labelsI);
 				ls.removeAll(r.insertLabels);
 				
 				for (String label : ls) {
@@ -70,8 +74,6 @@ public class GreedyRepairRecommendationSearch extends RepairRecommendationSearch
 					this.adjustCostFuncMOS(tempMOS,rec.getSkipLabels());
 					this.adjustCostFuncMOT(tempMOT,rec.getInsertLabels());
 					int cost = this.computeCost(tempMOS, tempMOT);
-					this.alignmentCostComputations++;
-					//System.out.println(rec);
 					
 					if (cost<=this.optimalCost) {
 						if (cost<this.optimalCost) recs.clear();
@@ -80,8 +82,8 @@ public class GreedyRepairRecommendationSearch extends RepairRecommendationSearch
 					}
 				}
 				
-				// handle insert labels
-				ls = new HashSet<String>(labels);
+				// handle skip labels
+				ls = new HashSet<String>(labelsS);
 				ls.removeAll(r.skipLabels);
 				
 				for (String label : ls) {
@@ -95,8 +97,6 @@ public class GreedyRepairRecommendationSearch extends RepairRecommendationSearch
 					this.adjustCostFuncMOS(tempMOS,rec.getSkipLabels());
 					this.adjustCostFuncMOT(tempMOT,rec.getInsertLabels());
 					int cost = this.computeCost(tempMOS, tempMOT);
-					this.alignmentCostComputations++;
-					//System.out.println(rec);
 					
 					if (cost<=this.optimalCost) {
 						if (cost<this.optimalCost) recs.clear();
@@ -106,7 +106,6 @@ public class GreedyRepairRecommendationSearch extends RepairRecommendationSearch
 				}
 			}
 			
-			//System.out.println(recs + " <<<<");
 		} while (!recs.isEmpty());
 		
 		this.backtrackOptimalRepairRecommendations();

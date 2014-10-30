@@ -34,11 +34,8 @@ import org.processmining.plugins.connectionfactories.logpetrinet.TransEvClassMap
 import org.processmining.plugins.petrinet.replayer.algorithms.IPNReplayParameter;
 import org.processmining.plugins.petrinet.replayer.algorithms.costbasedcomplete.CostBasedCompleteParam;
 import org.processmining.plugins.petrinet.replayer.algorithms.costbasedcomplete.CostBasedCompletePruneAlg;
-import org.processmining.plugins.petrinet.replayer.matchinstances.algorithms.express.AllOptAlignmentsGraphAlg;
-import org.processmining.plugins.petrinet.replayresult.PNMatchInstancesRepResult;
 import org.processmining.plugins.petrinet.replayresult.PNRepResult;
 import org.processmining.plugins.petrinet.replayresult.StepTypes;
-import org.processmining.plugins.replayer.replayresult.AllSyncReplayResult;
 import org.processmining.plugins.replayer.replayresult.SyncReplayResult;
 
 
@@ -468,8 +465,7 @@ public abstract class RepairRecommendationSearch {
 	}*/
 	
 	public int computeCost(Map<Transition,Integer> costMOS, Map<XEventClass,Integer> costMOT) {
-		PetrinetReplayerWithILP replayEngine = new PetrinetReplayerWithILP();
-		
+		PetrinetReplayerWithILP replayEngine = new PetrinetReplayerWithILP();		
 		//AllOptAlignmentsGraphAlg replayEngine = new AllOptAlignmentsGraphAlg();
 		//AllOptAlignmentsGraphILPAlg replayEngine = new AllOptAlignmentsGraphILPAlg();
 		//AllOptAlignmentsTreeAlg replayEngine = new AllOptAlignmentsTreeAlg();
@@ -488,14 +484,12 @@ public abstract class RepairRecommendationSearch {
 				
 		int cost = 0;
 		try {
-			PNRepResult result;
-			result = replayEngine.replayLog(context, net, log, mapping, parameters);
+			PNRepResult result = replayEngine.replayLog(context, net, log, mapping, parameters);
 			
 			for (SyncReplayResult res : result) {
 				cost += res.getInfo().get("Raw Fitness Cost") * res.getTraceIndex().size();
 			}
 		} catch (AStarException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 		
@@ -505,137 +499,54 @@ public abstract class RepairRecommendationSearch {
 	}
 	
 	public Map<AlignmentStep,Integer> computeFrequencies(Map<Transition,Integer> t2c, Map<XEventClass,Integer> e2c) {
-		//IPNReplayParameter parameters = new CostBasedCompleteManifestParam(e2c, t2c, this.initMarking, this.finalMarkings, this.maxNumOfStates, this.restrictedTrans);
-		//rameters.setGUIMode(false);
-		
-		AllOptAlignmentsGraphAlg replayEngine = new AllOptAlignmentsGraphAlg();
+		PetrinetReplayerWithILP replayEngine = new PetrinetReplayerWithILP();		
+		//AllOptAlignmentsGraphAlg replayEngine = new AllOptAlignmentsGraphAlg();
 		//AllOptAlignmentsGraphILPAlg replayEngine = new AllOptAlignmentsGraphILPAlg();
 		//AllOptAlignmentsTreeAlg replayEngine = new AllOptAlignmentsTreeAlg();
 		//CostBasedCompletePruneAlg replayEngine = new CostBasedCompletePruneAlg();
-		this.alignmentCostComputations += 1;
 		
-		Object[] parameters = new Object[3];
-		parameters[0] = t2c;
-		parameters[2] = e2c;
-		parameters[1] = Integer.MAX_VALUE;
+		IPNReplayParameter parameters = new CostBasedCompleteParam(e2c,t2c);
+		parameters.setInitialMarking(this.initMarking);
+		parameters.setFinalMarkings(this.finalMarkings[0]);
+		parameters.setGUIMode(false);
+		parameters.setCreateConn(false);
 		
-		PNMatchInstancesRepResult result = null;
+		/*Object[] parameters = new Object[3];
+		parameters[0] = costMOS;
+		parameters[2] = costMOT;
+		parameters[1] = Integer.MAX_VALUE;*/
+				
+		Map<AlignmentStep,Integer> map = new HashMap<AlignmentStep, Integer>();
 		try {
-			result = replayEngine.replayLog(this.context, this.net, this.initMarking, this.finalMarkings[0], this.log, this.mapping, parameters);
+			PNRepResult result = replayEngine.replayLog(context, net, log, mapping, parameters);
+			
+			for (SyncReplayResult res : result) {
+				List<Object> nodeInstance = res.getNodeInstance();
+				List<StepTypes> stepTypes = res.getStepTypes();
+				
+				for (int i=0; i<nodeInstance.size(); i++) {
+					StepTypes type = stepTypes.get(i);
+					if (type==StepTypes.LMGOOD) continue;
+					
+					AlignmentStep step = new AlignmentStep();
+					step.name = nodeInstance.get(i);
+					step.type = type;
+					
+					Integer c = map.get(step);
+					if (c==null)
+						map.put(step,res.getTraceIndex().size());
+					else
+						map.put(step,c+res.getTraceIndex().size());
+				}
+			}	
 		} catch (AStarException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 		
-		//PNRepResult result = replayEngine.replayLog(this.context, this.net, this.log, this.mapping, parameters);
-		
-		Map<AlignmentStep,Integer> map = new HashMap<AlignmentStep, Integer>();
-		for (AllSyncReplayResult res : result) {
-			/*System.out.println("==============================="); 
-			for (XEvent e: log.get(res.getTraceIndex().first()))
-				System.out.print(e.getAttributes().get("concept:name")+", ");
-			System.out.println();
-			System.out.println(res.getInfo());
-			System.out.println(res.getNodeInstance());
-			System.out.println(res.getStepTypes());
-			
-			System.out.println("===============================");*/
-			
-			List<Object> nodeInstance = res.getNodeInstanceLst().iterator().next();
-			List<StepTypes> stepTypes = res.getStepTypesLst().iterator().next();
-			for (int i=0; i<nodeInstance.size(); i++) {
-				StepTypes type = stepTypes.get(i);
-				if (type==StepTypes.LMGOOD) continue;
-				
-				AlignmentStep step = new AlignmentStep();
-				step.name = nodeInstance.get(i);
-				step.type = type;
-				
-				Integer c = map.get(step);
-				if (c==null)
-					map.put(step,1);
-				else
-					map.put(step, map.get(step)+1);
-			}
-		}
+		this.alignmentCostComputations++;
 		
 		return map;
 	}
-	
-	/*public Map<AlignmentStep,Integer> computeFrequencies(Map<Transition,Integer> t2c, Map<XEventClass,Integer> e2c) {		
-		IPNReplayParameter parameters = new CostBasedCompleteManifestParam(e2c, t2c, 
-					this.initMarking, this.finalMarkings, this.maxNumOfStates, this.restrictedTrans);
-		parameters.setGUIMode(false);
-		
-		CostBasedCompletePruneAlg replayEngine = new CostBasedCompletePruneAlg();
-		
-		this.alignmentCostComputations += 1;
-		
-		PNRepResult result = replayEngine.replayLog(this.context, this.net, this.log, this.mapping, parameters);
-		
-		Map<AlignmentStep,Integer> map = new HashMap<AlignmentStep, Integer>();
-		for (SyncReplayResult res : result) {
-			
-			System.out.println("==============================="); 
-			for (XEvent e: log.get(res.getTraceIndex().first()))
-				System.out.print(e.getAttributes().get("concept:name")+", ");
-			System.out.println();
-			System.out.println(res.getInfo());
-			System.out.println(res.getNodeInstance());
-			System.out.println(res.getStepTypes());
-			
-			System.out.println("===============================");
-			
-			for (int i=0; i<res.getNodeInstance().size(); i++) {
-				StepTypes type = res.getStepTypes().get(i);
-				if (type==StepTypes.LMGOOD) continue;
-				
-				AlignmentStep step = new AlignmentStep();
-				step.name = res.getNodeInstance().get(i);
-				step.type = type;
-				
-				Integer c = map.get(step);
-				if (c==null)
-					map.put(step,1);
-				else
-					map.put(step, map.get(step)+1);
-			}
-		}
-		
-		return map;
-	}*/
-	
-	/*public Map<AlignmentStep,Integer> computeFrequencies(Map<Transition,Integer> t2c, Map<XEventClass,Integer> e2c) {
-		IPNReplayParameter parameters = new CostBasedCompleteManifestParam(e2c, t2c, 
-										this.initMarking, this.finalMarkings, this.maxNumOfStates, this.restrictedTrans);
-		parameters.setGUIMode(false);
-		
-		CostBasedCompletePruneAlg replayEngine = new CostBasedCompletePruneAlg();
-		
-		this.alignmentCostComputations += 1;
-		
-		PNRepResult result = replayEngine.replayLog(this.context, this.net, this.log, this.mapping, parameters);
-		
-		Map<AlignmentStep,Integer> map = new HashMap<AlignmentStep, Integer>();
-		for (SyncReplayResult res : result) {
-			for (int i=0; i<res.getNodeInstance().size(); i++) {
-				StepTypes type = res.getStepTypes().get(i);
-				if (type==StepTypes.LMGOOD) continue;
-				
-				AlignmentStep step = new AlignmentStep();
-				step.name = res.getNodeInstance().get(i);
-				step.type = type;
-				
-				Integer c = map.get(step);
-				if (c==null)
-					map.put(step,1);
-				else
-					map.put(step, map.get(step)+1);
-			}
-		}
-		
-		return map;
-	}*/
 	
 	public class AlignmentStep {
 		public Object	 name = null;
