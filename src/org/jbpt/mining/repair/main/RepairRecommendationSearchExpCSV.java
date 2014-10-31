@@ -1,7 +1,6 @@
 package org.jbpt.mining.repair.main;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -38,7 +37,7 @@ import ee.ut.prom.XLogReader;
 /**
  * @author Artem Polyvyanyy
  */
-public class RepairRecommendationSearchExp {
+public class RepairRecommendationSearchExpCSV {
 	
 	private enum RR_SEARCH_ALGORITHM {BF,BF2,GREEDY,GOLDRATT,KNAPSACK};
 	
@@ -55,8 +54,8 @@ public class RepairRecommendationSearchExp {
 		log2nets.put("AO", aoNets);
 		
 		algs.add(RR_SEARCH_ALGORITHM.KNAPSACK);
-		//algs.add(RR_SEARCH_ALGORITHM.GOLDRATT);
-		//algs.add(RR_SEARCH_ALGORITHM.GREEDY);
+		algs.add(RR_SEARCH_ALGORITHM.GOLDRATT);
+		algs.add(RR_SEARCH_ALGORITHM.GREEDY);
 		//algs.add(RR_SEARCH_ALGORITHM.BF2);
 		//algs.add(RR_SEARCH_ALGORITHM.BF);
 		
@@ -70,18 +69,18 @@ public class RepairRecommendationSearchExp {
 		Map<XEventClass,Integer> costMOT = null; // movements on trace
 		TransEvClassMapping mapping = null;
 		boolean debug = false;
-		int maxRepairResources = 15;
+		int maxRepairResources = 12;
 		
 		// experiment
+		System.out.println("Alg.,Log,Net,Res,Time,Recs,Recs#,Comp#,Cost");
 		for (Map.Entry<String,Set<String>> entry : log2nets.entrySet()) {
 			String logFile = entry.getKey();
 			for (String netFile : entry.getValue()) {				
 				for (int res=0; res<=maxRepairResources; res++) {
 					for (RR_SEARCH_ALGORITHM alg : algs) {
-						System.out.println("----------------------------------------");
-						System.out.println(String.format("Start %s repair...", alg));
-						System.out.println("Log file: "+logFile);
-						System.out.println("Net file: "+netFile);
+						System.out.print(alg+",");
+						System.out.print(logFile+",");
+						System.out.print(netFile+",");
 						
 						net = constructNet("./exp/"+netFile+".pnml");
 						initialMarking = getInitialMarking(net);
@@ -92,10 +91,10 @@ public class RepairRecommendationSearchExp {
 						costMOT = constructMOTCostFunction(net,log,dummyEvClass);
 						mapping = constructMapping(net,log,dummyEvClass);
 						
-						System.out.println("Initial marking: "+initialMarking);
-						System.out.println("Final markings: "+Arrays.toString(finalMarkings));
-						System.out.println("MOS costs: "+costMOS);
-						System.out.println("MOT costs: "+costMOT);
+						//System.out.println("Initial marking: "+initialMarking);
+						//System.out.println("Final markings: "+Arrays.toString(finalMarkings));
+						//System.out.println("MOS costs: "+costMOS);
+						//System.out.println("MOT costs: "+costMOT);
 						
 						switch (alg) {
 							case BF : 
@@ -127,19 +126,19 @@ public class RepairRecommendationSearchExp {
 						Map<String,Integer> skipCosts = CostFunction.getStdCostFunctionOnLabels(netLabels);
 						RepairConstraint constraint = new RepairConstraint(insertCosts,skipCosts,res);
 						
-						System.out.println("Insert costs: "+insertCosts);
-						System.out.println("Skip costs: "+skipCosts);
-						System.out.println("Repair resources: "+res);
+						//System.out.println("Insert costs: "+insertCosts);
+						//System.out.println("Skip costs: "+skipCosts);
+						System.out.print(res+",");
 						
 						long start = System.nanoTime();
 						Set<RepairRecommendation> recs = rrSearch.computeOptimalRepairRecommendations(constraint);
 						long end = System.nanoTime();
 						
-						System.out.println("Repair recommendations search time: "+(end-start));
-						System.out.println("Repair recommendations: "+recs);
-						System.out.println("Number of repair recommendations: "+recs.size());
-						System.out.println("Number of alignment computations: "+rrSearch.getNumberOfAlignmentCostComputations());
-						System.out.println("Optimal alignment cost achieved: "+rrSearch.getOptimalCost());
+						System.out.print((end-start)+",");
+						System.out.print(recs.toString().replace(",", ";")+",");
+						System.out.print(recs.size()+",");
+						System.out.print(rrSearch.getNumberOfAlignmentCostComputations()+",");
+						System.out.print(rrSearch.getOptimalCost());
 						
 						int count = 0;
 						for (RepairRecommendation rec : recs) {
@@ -148,16 +147,18 @@ public class RepairRecommendationSearchExp {
 							PetrinetGraph repaired = rrSearch.repair(rec);
 							rrSearch.serializeNet(repaired,repairedName);
 							
-							System.out.println("Repaired net serialized in: "+repairedName+" after applying "+rec);
+							//System.out.println("Repaired net serialized in: "+repairedName+" after applying "+rec);
 							count++;
 						}
+						
+						System.out.println();
 					}
 				}
 			}
 		}
 		
-		System.out.println("----------------------------------------");
-		System.out.println("DONE!");
+		//System.out.println("----------------------------------------");
+		//System.out.println("DONE!");
 	}
 
 	private static TransEvClassMapping constructMapping(PetrinetGraph net, XLog log, XEventClass dummyEvClass) {

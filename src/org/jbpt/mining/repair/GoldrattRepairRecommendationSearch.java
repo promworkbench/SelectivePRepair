@@ -1,6 +1,9 @@
 package org.jbpt.mining.repair;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -8,55 +11,51 @@ import java.util.Set;
 import org.deckfour.xes.classification.XEventClass;
 import org.deckfour.xes.classification.XEventClassifier;
 import org.deckfour.xes.model.XLog;
-import org.jbpt.mining.Knapsack01DynamicOneSolution;
 import org.processmining.models.graphbased.directed.petrinet.PetrinetGraph;
 import org.processmining.models.graphbased.directed.petrinet.elements.Transition;
 import org.processmining.models.semantics.petrinet.Marking;
 import org.processmining.plugins.connectionfactories.logpetrinet.TransEvClassMapping;
 import org.processmining.plugins.petrinet.replayresult.StepTypes;
 
-
 /**
  * @author Artem Polyvyanyy
  * 
- * TODO: check if all optimal alignments are considered
- * TODO: weighted frequencies, based on the number of optimal alignments
+ * TODO: consider all optimal alignments of a trace with a model
  */
 public class GoldrattRepairRecommendationSearch extends RepairRecommendationSearch {
 	
-		public GoldrattRepairRecommendationSearch(
-				PetrinetGraph	net, 
-				Marking			initMarking, 
-				Marking[]		finalMarkings, 
-				XLog 			log, 
-				Map<Transition,Integer>		costMOS, 
-				Map<XEventClass,Integer>	costMOT, 
-				TransEvClassMapping			mapping, 
-				XEventClassifier 			eventClassifier,
-				boolean 					debug) throws Exception {
+	public GoldrattRepairRecommendationSearch(PetrinetGraph net, 
+			Marking			initMarking, 
+			Marking[]		finalMarkings, 
+			XLog 			log, 
+			Map<Transition,Integer>		costMOS, 
+			Map<XEventClass,Integer>	costMOT, 
+			TransEvClassMapping			mapping,
+			XEventClassifier		 	eventClassifier,
+			boolean 					debug) throws Exception {			
 		super(net, initMarking, finalMarkings, log, costMOS, costMOT, mapping, eventClassifier, debug);
 	}
-		
-	private Map<String,Integer> costFuncMOSwL = new HashMap<String,Integer>();
-	private Map<String,Integer> costFuncMOTwL = new HashMap<String,Integer>();
+	
+	Map<String,Integer> costFuncMOSwL = new HashMap<String,Integer>();
+	Map<String,Integer> costFuncMOTwL = new HashMap<String,Integer>();
 	private Map<String,Double> costFuncMOSwLperR = new HashMap<String,Double>();
 	private Map<String,Double> costFuncMOTwLperR = new HashMap<String,Double>();
-
-	@Override
-	public Set<RepairRecommendation> computeOptimalRepairRecommendations(RepairConstraint constraint) {
-		this.alignmentCostComputations	= 0;
-		this.optimalRepairRecommendations.clear();
+	
+	private List<Label> prepare(RepairRecommendation r, RepairConstraint constraint) {
+		Map<Transition,Integer>  tempMOS	= new HashMap<Transition,Integer>(this.costFuncMOS);
+		Map<XEventClass,Integer> tempMOT	= new HashMap<XEventClass,Integer>(this.costFuncMOT);
+		this.adjustCostFuncMOS(tempMOS,r.getSkipLabels());
+		this.adjustCostFuncMOT(tempMOT,r.getInsertLabels());
 		
-		// get movement frequencies 
-		Map<AlignmentStep,Integer> frequencies = this.computeFrequencies(this.costFuncMOS, this.costFuncMOT);
-		if (debug) System.out.println("DEBUG> Movement frequencies:" + frequencies);
+		Map<AlignmentStep,Integer> frequencies = this.computeFrequencies(tempMOS,tempMOT);
+		this.updateFrequencies(frequencies,r);
 		
 		Map<Transition,Integer>	 costFuncMOSw = new HashMap<Transition, Integer>();
 		Map<XEventClass,Integer> costFuncMOTw = new HashMap<XEventClass, Integer>();
 		
 		// weight transition costs
 		for (Map.Entry<Transition,Integer> entryA : this.costFuncMOS.entrySet()) {
-			int coef = 0;
+			int freq = 0;
 			for (Map.Entry<AlignmentStep,Integer> entryB : frequencies.entrySet()) {
 				AlignmentStep step = entryB.getKey();
 				if (step.type!=StepTypes.MREAL) continue;
@@ -64,16 +63,16 @@ public class GoldrattRepairRecommendationSearch extends RepairRecommendationSear
 				Transition t = entryA.getKey();
 				if (!tt.equals(t)) continue;
 				
-				coef = entryB.getValue();
+				freq = entryB.getValue();
 				break;
 			}
 			
-			costFuncMOSw.put(entryA.getKey(), entryA.getValue()*coef);
+			costFuncMOSw.put(entryA.getKey(), entryA.getValue()*freq);
 		}
 		
 		// weight evClass costs
 		for (Map.Entry<XEventClass,Integer> entryA : this.costFuncMOT.entrySet()) {
-			int coef = 0;
+			int freq = 0;
 			for (Map.Entry<AlignmentStep,Integer> entryB : frequencies.entrySet()) {
 				AlignmentStep step = entryB.getKey();
 				if (step.type!=StepTypes.L) continue;
@@ -81,15 +80,12 @@ public class GoldrattRepairRecommendationSearch extends RepairRecommendationSear
 				XEventClass ec = entryA.getKey();
 				if (!ecc.equals(ec)) continue;
 				
-				coef = entryB.getValue();
+				freq = entryB.getValue();
 				break;
 			}
 			
-			costFuncMOTw.put(entryA.getKey(), entryA.getValue()*coef);
+			costFuncMOTw.put(entryA.getKey(), entryA.getValue()*freq);
 		}
-		
-		System.out.println("T:" + costFuncMOSw);		// weighted costs for MOS
-		System.out.println("E:" + costFuncMOTw);		// weighted costs for MOT
 		
 		// get label weights
 		costFuncMOSwL.clear();
@@ -129,12 +125,8 @@ public class GoldrattRepairRecommendationSearch extends RepairRecommendationSear
 			}
 		}
 		
-		System.out.println("WLT:" + costFuncMOSwL);		// weighted costs for MOS label
-		System.out.println("WLE:" + costFuncMOTwL);		// weighted costs for MOT label
-		
-		// get per unit costs
-		
-		/*costFuncMOSwLperR.clear();
+		// get weight per unit of repair resource
+		costFuncMOSwLperR.clear();
 		costFuncMOTwLperR.clear();
 		
 		for (Map.Entry<String,Integer> entry : costFuncMOSwL.entrySet())
@@ -143,67 +135,153 @@ public class GoldrattRepairRecommendationSearch extends RepairRecommendationSear
 		for (Map.Entry<String,Integer> entry : costFuncMOTwL.entrySet())
 			costFuncMOTwLperR.put(entry.getKey(), (double) entry.getValue() / constraint.getInsertCosts().get(entry.getKey()));
 		
-		System.out.println("T:" + costFuncMOSwLperR);		// weighted costs for MOS label per resource
-		System.out.println("E:" + costFuncMOTwLperR);		// weighted costs for MOT label per resource*/
+		// sort labels
+		//System.out.println("not sorted: " + labels);
+		Collections.sort(labels);
+		Collections.reverse(labels);
+		//System.out.println("sorted: " + labels);
 		
-		int N = labels.size();
-		int[] profit = new int[N+1];
-        int[] weight = new int[N+1];
-        
-        for (int n=1; n<=N; n++) {
-        	Label lb = labels.get(n-1);
-        	if (lb.isTransition) {
-        		profit[n] = costFuncMOSwL.get(lb.label);
-                weight[n] = constraint.getSkipCosts().get(lb.label);	
-        	}
-        	else {
-        		profit[n] = costFuncMOTwL.get(lb.label);
-                weight[n] = constraint.getInsertCosts().get(lb.label);
-        	}
-        }
-        
-        System.out.println("LABELS: "+labels);
-        System.out.print("PROFIT: ");
-        for (int n=1; n<=N; n++)
-        	System.out.print(profit[n]+" ");
-        System.out.println();
-        System.out.print("WEIGHT: ");
-        for (int n=1; n<=N; n++)
-        	System.out.print(weight[n]+" ");
-        System.out.println();
-        
-        // TODO: get all solutions to the Knapsack problem 
-        boolean[] take = Knapsack01DynamicOneSolution.solve(profit, weight, (int) constraint.getAvailableResources());
-        
-        RepairRecommendation rec = new RepairRecommendation();
-        for (int n=1; n<=N; n++) {
-        	if (!take[n]) continue;
-        	
-        	Label lb = labels.get(n-1);
-			if (lb.isTransition)
-				rec.skipLabels.add(lb.label);
-			else
-				rec.insertLabels.add(lb.label);
+		return labels;
+	}
+
+	@Override
+	public Set<RepairRecommendation> computeOptimalRepairRecommendations(RepairConstraint constraint) {
+		this.alignmentCostComputations = 0;
+		
+		// empty recommendation to start with
+		Set<RepairRecommendation> recs = new HashSet<RepairRecommendation>();
+		RepairRecommendation recommendation	= new RepairRecommendation();
+		recs.add(recommendation);
+		
+		do {
+			this.optimalRepairRecommendations.clear();
+			this.optimalRepairRecommendations.addAll(recs);
+			recs.clear();
+			
+			int investRes  = Integer.MIN_VALUE; 
+			double gain = Double.MIN_VALUE;
+			
+			for (RepairRecommendation r : this.optimalRepairRecommendations) {
+				if (debug) System.out.println("DEBUG> Current repair recomendation: " + r);
+				
+				List<Label> labels = prepare(r,constraint);
+				
+				Iterator<Label> i = labels.iterator();
+				while (i.hasNext()) {
+					Label cl = i.next();
+					
+					int newRes = 0;
+					double weight = 0.0;
+					
+					if (cl.isTransition) {
+						newRes = constraint.getSkipCosts().get(cl.label);
+						weight = costFuncMOSwLperR.get(cl.label);
+					}
+					else {
+						newRes = constraint.getInsertCosts().get(cl.label);
+						weight = costFuncMOTwLperR.get(cl.label);
+					}
+					
+					double usedRes = CostFunction.getRequiredResources(constraint, r);
+					
+					if (usedRes+newRes <= constraint.getAvailableResources()) {						
+						if (weight > gain) {
+							RepairRecommendation rec = r.clone();
+							if (cl.isTransition)
+								rec.skipLabels.add(cl.label);
+							else
+								rec.insertLabels.add(cl.label);
+							
+							recs.clear();
+							recs.add(rec);
+							
+							gain = weight;
+							investRes = newRes;
+						}
+						else if (weight==gain) {
+							if (newRes>investRes) {
+								RepairRecommendation rec = r.clone();
+								if (cl.isTransition)
+									rec.skipLabels.add(cl.label);
+								else
+									rec.insertLabels.add(cl.label);
+								
+								recs.clear();
+								recs.add(rec);
+								
+								investRes = newRes;	
+							}
+							else if (newRes==investRes) {
+								RepairRecommendation rec = r.clone();
+								if (cl.isTransition)
+									rec.skipLabels.add(cl.label);
+								else
+									rec.insertLabels.add(cl.label);
+								
+								recs.add(rec);
+							}
+						}
+					}
+				}
+			}
+			if (debug) System.out.println("DEBUG> Repair recommendations: " + recs);
+			
+			/*for (RepairRecommendation rec : recs) {
+				Map<Transition,Integer>  tempMOS	= new HashMap<Transition,Integer>(this.costFuncMOS);
+				Map<XEventClass,Integer> tempMOT	= new HashMap<XEventClass,Integer>(this.costFuncMOT);
+				this.adjustCostFuncMOS(tempMOS,rec.getSkipLabels());
+				this.adjustCostFuncMOT(tempMOT,rec.getInsertLabels());
+				
+				// compute cost
+				int cost = this.computeCost(tempMOS, tempMOT);
+				if (this.debug) System.out.println(String.format("DEBUG> %s : %s", rec, cost));
+			}*/
+			
+			
+		} while (!recs.isEmpty());
+		
+		/*if (this.debug) System.out.println(String.format("----"));
+		for (RepairRecommendation rec : this.optimalRepairRecommendations) {
+			Map<Transition,Integer>  tempMOS	= new HashMap<Transition,Integer>(this.costFuncMOS);
+			Map<XEventClass,Integer> tempMOT	= new HashMap<XEventClass,Integer>(this.costFuncMOT);
+			this.adjustCostFuncMOS(tempMOS,rec.getSkipLabels());
+			this.adjustCostFuncMOT(tempMOT,rec.getInsertLabels());
+			
+			// compute cost
+			int cost = this.computeCost(tempMOS, tempMOT);
+			if (this.debug) System.out.println(String.format("DEBUG> %s : %s", rec, cost));
 		}
-        
-        this.optimalRepairRecommendations.add(rec);
+		if (this.debug) System.out.println(String.format("----"));*/
 		
-		rec = this.optimalRepairRecommendations.iterator().next();
+		RepairRecommendation rec = this.optimalRepairRecommendations.iterator().next();
 		
 		Map<Transition,Integer>  tempMOS	= new HashMap<Transition,Integer>(this.costFuncMOS);
 		Map<XEventClass,Integer> tempMOT	= new HashMap<XEventClass,Integer>(this.costFuncMOT);
 		this.adjustCostFuncMOS(tempMOS,rec.getSkipLabels());
 		this.adjustCostFuncMOT(tempMOT,rec.getInsertLabels());
 		
-		System.out.println("MOS>>> "+tempMOS);
-		System.out.println("MOT>>> "+tempMOT);
-		System.out.println("FREQUENCIES>>> "+this.computeFrequencies(tempMOS, tempMOT));
 		this.optimalCost = this.computeCost(tempMOS, tempMOT);
-		this.alignmentCostComputations++;
 		
 		return this.optimalRepairRecommendations;
 	}
 	
+	private void updateFrequencies(Map<AlignmentStep,Integer> frequencies, RepairRecommendation r) {
+		Set<AlignmentStep> toRemove = new HashSet<AlignmentStep>();
+		
+		for (Map.Entry<AlignmentStep,Integer> entry : frequencies.entrySet()) {
+			AlignmentStep step = entry.getKey();
+			
+			if (step.type==StepTypes.MREAL && r.getSkipLabels().contains(step.name.toString()))
+				toRemove.add(step);
+
+			if (step.type==StepTypes.L && r.getInsertLabels().contains(step.name.toString()))
+				toRemove.add(step);
+		}
+		
+		for (AlignmentStep step : toRemove)
+			frequencies.remove(step);
+	}
+
 	public class Label implements Comparable<Label> {
 		public boolean isTransition = false;
 		public String label = "";
@@ -233,16 +311,10 @@ public class GoldrattRepairRecommendationSearch extends RepairRecommendationSear
 			else
 				wO = costFuncMOTwLperR.get(o.label);
 				
-			if (wThis<wO) 
-				return -1;
-			if (wThis>wO) 
-				return 1;
+			if (wThis<wO) return -1;
+			if (wThis>wO) return 1;
 			
 			return 0;
 		}
 	}
-	
-	
-	
-	
 }

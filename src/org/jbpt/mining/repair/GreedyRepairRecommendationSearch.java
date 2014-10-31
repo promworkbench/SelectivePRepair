@@ -16,7 +16,7 @@ import org.processmining.plugins.connectionfactories.logpetrinet.TransEvClassMap
 /**
  * @author Artem Polyvyanyy
  * 
- * TODO: think of a stopping condition once all expansions of a repair recommendation do not lead to alignment improvement
+ * TODO: think of a termination condition once all expansions of current repair recommendation do not lead to alignment improvement
  */
 public class GreedyRepairRecommendationSearch extends RepairRecommendationSearch {
 	
