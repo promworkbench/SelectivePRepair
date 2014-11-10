@@ -143,9 +143,9 @@ public class GoldrattRepairRecommendationSearch extends RepairRecommendationSear
 		
 		return labels;
 	}
-
+	
 	@Override
-	public Set<RepairRecommendation> computeOptimalRepairRecommendations(RepairConstraint constraint) {
+	public Set<RepairRecommendation> computeOptimalRepairRecommendations(RepairConstraint constraint, boolean considerAllExtensions) {
 		this.alignmentCostComputations = 0;
 		
 		// empty recommendation to start with
@@ -155,7 +155,12 @@ public class GoldrattRepairRecommendationSearch extends RepairRecommendationSear
 		
 		do {
 			this.optimalRepairRecommendations.clear();
-			this.optimalRepairRecommendations.addAll(recs);
+			
+			if (considerAllExtensions)
+				this.optimalRepairRecommendations.addAll(recs);
+			else
+				this.optimalRepairRecommendations.add(recs.iterator().next());
+			
 			recs.clear();
 			
 			int investRes  = Integer.MIN_VALUE; 
@@ -263,6 +268,11 @@ public class GoldrattRepairRecommendationSearch extends RepairRecommendationSear
 		this.optimalCost = this.computeCost(tempMOS, tempMOT);
 		
 		return this.optimalRepairRecommendations;
+	}
+
+	@Override
+	public Set<RepairRecommendation> computeOptimalRepairRecommendations(RepairConstraint constraint) {
+		return this.computeOptimalRepairRecommendations(constraint,true);
 	}
 	
 	private void updateFrequencies(Map<AlignmentStep,Integer> frequencies, RepairRecommendation r) {

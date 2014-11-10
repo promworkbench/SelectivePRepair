@@ -29,11 +29,9 @@ import org.processmining.models.graphbased.directed.petrinet.elements.Transition
 import org.processmining.models.graphbased.directed.petrinet.impl.PetrinetFactory;
 import org.processmining.models.semantics.petrinet.Marking;
 import org.processmining.plugins.astar.petrinet.PetrinetReplayerWithILP;
-import org.processmining.plugins.astar.petrinet.manifestreplay.CostBasedCompleteManifestParam;
 import org.processmining.plugins.connectionfactories.logpetrinet.TransEvClassMapping;
 import org.processmining.plugins.petrinet.replayer.algorithms.IPNReplayParameter;
 import org.processmining.plugins.petrinet.replayer.algorithms.costbasedcomplete.CostBasedCompleteParam;
-import org.processmining.plugins.petrinet.replayer.algorithms.costbasedcomplete.CostBasedCompletePruneAlg;
 import org.processmining.plugins.petrinet.replayresult.PNRepResult;
 import org.processmining.plugins.petrinet.replayresult.StepTypes;
 import org.processmining.plugins.replayer.replayresult.SyncReplayResult;
@@ -63,7 +61,7 @@ public abstract class RepairRecommendationSearch {
 	protected int optimalCost = Integer.MAX_VALUE;
 	protected Set<RepairRecommendation> optimalRepairRecommendations = null;
 	
-	protected boolean debug = false;
+	protected boolean debug = true;
 	
 	protected RepairRecommendationSearch(
 			PetrinetGraph	net, 
@@ -109,6 +107,8 @@ public abstract class RepairRecommendationSearch {
 	public int getNumberOfAlignmentCostComputations() {
 		return this.alignmentCostComputations;
 	}
+	
+	public abstract Set<RepairRecommendation> computeOptimalRepairRecommendations(RepairConstraint constraint, boolean considerAllExtensions);
 	
 	public abstract Set<RepairRecommendation> computeOptimalRepairRecommendations(RepairConstraint constraint);
 	
@@ -237,14 +237,27 @@ public abstract class RepairRecommendationSearch {
 		this.adjustCostFuncMOS(tempMOS,rec.getSkipLabels());
 		this.adjustCostFuncMOT(tempMOT,rec.getInsertLabels());
 		
-		IPNReplayParameter parameters = new CostBasedCompleteManifestParam(tempMOT, tempMOS,
-					this.initMarking, this.finalMarkings, this.maxNumOfStates, this.restrictedTrans);
+		PetrinetReplayerWithILP replayEngine = new PetrinetReplayerWithILP();		
 		
+		
+		IPNReplayParameter parameters = new CostBasedCompleteParam(tempMOT,tempMOS);
+		parameters.setInitialMarking(this.initMarking);
+		parameters.setFinalMarkings(this.finalMarkings[0]);
 		parameters.setGUIMode(false);
+		parameters.setCreateConn(false);
+	
+		// OLD alignment
+		//IPNReplayParameter parameters = new CostBasedCompleteManifestParam(tempMOT, tempMOS,
+					//this.initMarking, this.finalMarkings, this.maxNumOfStates, this.restrictedTrans);
+		//parameters.setGUIMode(false);
+		//CostBasedCompletePruneAlg replayEngine = new CostBasedCompletePruneAlg();
 
-		CostBasedCompletePruneAlg replayEngine = new CostBasedCompletePruneAlg();
-
-		PNRepResult result = replayEngine.replayLog(this.context, this.net, this.log, this.mapping, parameters);
+		PNRepResult result = null;
+		try {
+			result = replayEngine.replayLog(this.context, this.net, this.log, this.mapping, parameters);
+		} catch (AStarException e1) {
+			e1.printStackTrace();
+		}
 	
 		// REPAIR MOVES ON MODEL (skip labels)
 		Set<Object> toSkip = new HashSet<Object>();

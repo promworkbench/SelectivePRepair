@@ -36,6 +36,7 @@ public class BruteForceRepairRecommendationSearchWithOptimization extends Repair
 	private void computeOptimalRepairRecommendations(RepairConstraint constraint, RepairRecommendation recommendation, 
 							RepairRecommendation previousRecommendation, Set<String> labelsI, Set<String> labelsS, boolean first) {
 		
+		if (this.optimalCost<=0) return;
 		if (visited.contains(recommendation)) return;
 		
 		// recommendation is over my budget!
@@ -95,6 +96,11 @@ public class BruteForceRepairRecommendationSearchWithOptimization extends Repair
 
 	@Override
 	public Set<RepairRecommendation> computeOptimalRepairRecommendations(RepairConstraint constraint) {
+		return this.computeOptimalRepairRecommendations(constraint,true);
+	}
+	
+	@Override
+	public Set<RepairRecommendation> computeOptimalRepairRecommendations(RepairConstraint constraint, boolean considerAllExtensions) {
 		this.alignmentCostComputations	= 0;
 		this.optimalRepairRecommendations.clear();
 		this.visited.clear();

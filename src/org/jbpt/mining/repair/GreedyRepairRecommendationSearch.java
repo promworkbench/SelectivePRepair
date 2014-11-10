@@ -34,6 +34,10 @@ public class GreedyRepairRecommendationSearch extends RepairRecommendationSearch
 
 	@Override
 	public Set<RepairRecommendation> computeOptimalRepairRecommendations(RepairConstraint constraint) {
+		return this.computeOptimalRepairRecommendations(constraint,true);
+	}
+
+	public Set<RepairRecommendation> computeOptimalRepairRecommendations(RepairConstraint constraint, boolean considerAllExtensions) {
 		this.alignmentCostComputations	= 0;
 		this.optimalRepairRecommendations.clear();
 				
@@ -54,8 +58,14 @@ public class GreedyRepairRecommendationSearch extends RepairRecommendationSearch
 		
 		do {
 			if (debug) System.out.println("DEBUG> Alignment computations: "+this.alignmentCostComputations);
+			if (this.optimalCost<=0) break;
 			this.optimalRepairRecommendations.clear();
-			this.optimalRepairRecommendations.addAll(recs);
+			
+			if (considerAllExtensions)
+				this.optimalRepairRecommendations.addAll(recs);
+			else
+				this.optimalRepairRecommendations.add(recs.iterator().next());
+				
 			recs.clear();
 			
 			for (RepairRecommendation r : this.optimalRepairRecommendations) {

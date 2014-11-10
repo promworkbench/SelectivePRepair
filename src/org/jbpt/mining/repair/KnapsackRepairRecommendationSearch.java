@@ -44,6 +44,10 @@ public class KnapsackRepairRecommendationSearch extends RepairRecommendationSear
 
 	@Override
 	public Set<RepairRecommendation> computeOptimalRepairRecommendations(RepairConstraint constraint) {
+		return this.computeOptimalRepairRecommendations(constraint,true);
+	}
+	
+	public Set<RepairRecommendation> computeOptimalRepairRecommendations(RepairConstraint constraint, boolean considerAllExtensions) {
 		this.alignmentCostComputations	= 0;
 		this.optimalRepairRecommendations.clear();
 		
@@ -215,8 +219,4 @@ public class KnapsackRepairRecommendationSearch extends RepairRecommendationSear
 			return 0;
 		}
 	}
-	
-	
-	
-	
 }
