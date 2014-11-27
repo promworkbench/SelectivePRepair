@@ -100,7 +100,7 @@ public class BruteForceRepairRecommendationSearchWithOptimization extends Repair
 	}
 	
 	@Override
-	public Set<RepairRecommendation> computeOptimalRepairRecommendations(RepairConstraint constraint, boolean considerAllExtensions) {
+	public Set<RepairRecommendation> computeOptimalRepairRecommendations(RepairConstraint constraint, boolean considerAll) {
 		this.alignmentCostComputations	= 0;
 		this.optimalRepairRecommendations.clear();
 		this.visited.clear();

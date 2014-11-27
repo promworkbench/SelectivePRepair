@@ -126,6 +126,7 @@ public class KnapsackRepairRecommendationSearch extends RepairRecommendationSear
 				labels.add(new Label(label, false));
 			}
 			else {
+				// TODO: this never executes
 				costFuncMOTwL.put(label, val+weight);
 			}
 		}

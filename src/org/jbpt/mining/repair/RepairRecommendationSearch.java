@@ -108,7 +108,7 @@ public abstract class RepairRecommendationSearch {
 		return this.alignmentCostComputations;
 	}
 	
-	public abstract Set<RepairRecommendation> computeOptimalRepairRecommendations(RepairConstraint constraint, boolean considerAllExtensions);
+	public abstract Set<RepairRecommendation> computeOptimalRepairRecommendations(RepairConstraint constraint, boolean considerAll);
 	
 	public abstract Set<RepairRecommendation> computeOptimalRepairRecommendations(RepairConstraint constraint);
 	

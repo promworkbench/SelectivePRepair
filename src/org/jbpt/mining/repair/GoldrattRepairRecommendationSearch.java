@@ -145,7 +145,7 @@ public class GoldrattRepairRecommendationSearch extends RepairRecommendationSear
 	}
 	
 	@Override
-	public Set<RepairRecommendation> computeOptimalRepairRecommendations(RepairConstraint constraint, boolean considerAllExtensions) {
+	public Set<RepairRecommendation> computeOptimalRepairRecommendations(RepairConstraint constraint, boolean considerAll) {
 		this.alignmentCostComputations = 0;
 		
 		// empty recommendation to start with
@@ -156,27 +156,27 @@ public class GoldrattRepairRecommendationSearch extends RepairRecommendationSear
 		do {
 			this.optimalRepairRecommendations.clear();
 			
-			if (considerAllExtensions)
+			if (considerAll)
 				this.optimalRepairRecommendations.addAll(recs);
 			else
 				this.optimalRepairRecommendations.add(recs.iterator().next());
 			
 			recs.clear();
 			
-			int investRes  = Integer.MIN_VALUE; 
-			double gain = Double.MIN_VALUE;
+			int investRes = Integer.MIN_VALUE; 
+			double gain	  = Double.MIN_VALUE;
 			
 			for (RepairRecommendation r : this.optimalRepairRecommendations) {
 				if (debug) System.out.println("DEBUG> Current repair recomendation: " + r);
 				
-				List<Label> labels = prepare(r,constraint);
+				List<Label> labels = prepare(r,constraint); // compute alignment to rank labels
 				
 				Iterator<Label> i = labels.iterator();
 				while (i.hasNext()) {
 					Label cl = i.next();
 					
-					int newRes = 0;
-					double weight = 0.0;
+					int newRes = 0;			// resources I plan to spend
+					double weight = 0.0;	// current label weight per resource
 					
 					if (cl.isTransition) {
 						newRes = constraint.getSkipCosts().get(cl.label);
