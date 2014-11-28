@@ -68,10 +68,10 @@ public class RepairRecommendationSearchExpCSV {
 		//log2classifier.put("CoSeLoG WABO 1",XLogInfoImpl.NAME_CLASSIFIER);
 		
 		//algs.add(RR_SEARCH_ALGORITHM.KNAPSACK_ONE);
-		algs.add(RR_SEARCH_ALGORITHM.GOLDRATT_ALL);
-		algs.add(RR_SEARCH_ALGORITHM.GOLDRATT_ONE);
-		/*algs.add(RR_SEARCH_ALGORITHM.GREEDY_ALL);
-		algs.add(RR_SEARCH_ALGORITHM.GREEDY_ONE);*/
+		//algs.add(RR_SEARCH_ALGORITHM.GOLDRATT_ALL);
+		//algs.add(RR_SEARCH_ALGORITHM.GOLDRATT_ONE);
+		algs.add(RR_SEARCH_ALGORITHM.GREEDY_ALL);
+		algs.add(RR_SEARCH_ALGORITHM.GREEDY_ONE);
 		//
 		//algs.add(RR_SEARCH_ALGORITHM.BF2);
 		//algs.add(RR_SEARCH_ALGORITHM.BF);
@@ -86,7 +86,7 @@ public class RepairRecommendationSearchExpCSV {
 		Map<XEventClass,Integer> costMOT = null; // movements on trace
 		TransEvClassMapping mapping = null;
 		boolean debug = false;
-		int maxRepairResources = 15;
+		int maxRepairResources = 10;
 		
 		// experiment
 		System.out.println("Alg.,Log,Net,Res,Time,Recs,Recs#,Comp#,Cost,Correct");

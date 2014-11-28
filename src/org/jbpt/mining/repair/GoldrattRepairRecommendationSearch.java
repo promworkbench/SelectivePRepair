@@ -155,12 +155,9 @@ public class GoldrattRepairRecommendationSearch extends RepairRecommendationSear
 		
 		do {
 			this.optimalRepairRecommendations.clear();
+			this.optimalRepairRecommendations.addAll(recs);
 			
-			if (considerAll)
-				this.optimalRepairRecommendations.addAll(recs);
-			else
-				this.optimalRepairRecommendations.add(recs.iterator().next());
-			
+			if (constraint.getAvailableResources()<=0) break;
 			recs.clear();
 			
 			int investRes = Integer.MIN_VALUE; 
@@ -169,7 +166,8 @@ public class GoldrattRepairRecommendationSearch extends RepairRecommendationSear
 			for (RepairRecommendation r : this.optimalRepairRecommendations) {
 				if (debug) System.out.println("DEBUG> Current repair recomendation: " + r);
 				
-				List<Label> labels = prepare(r,constraint); // compute alignment to rank labels
+				List<Label> labels = prepare(r,constraint); 						// compute alignment and rank labels
+				double usedRes = CostFunction.getRequiredResources(constraint, r);	// so far used resources
 				
 				Iterator<Label> i = labels.iterator();
 				while (i.hasNext()) {
@@ -186,8 +184,6 @@ public class GoldrattRepairRecommendationSearch extends RepairRecommendationSear
 						newRes = constraint.getInsertCosts().get(cl.label);
 						weight = costFuncMOTwLperR.get(cl.label);
 					}
-					
-					double usedRes = CostFunction.getRequiredResources(constraint, r);
 					
 					if (usedRes+newRes <= constraint.getAvailableResources()) {						
 						if (weight > gain) {
@@ -214,9 +210,9 @@ public class GoldrattRepairRecommendationSearch extends RepairRecommendationSear
 								recs.clear();
 								recs.add(rec);
 								
-								investRes = newRes;	
+								investRes = newRes;
 							}
-							else if (newRes==investRes) {
+							else if (newRes==investRes && considerAll) {
 								RepairRecommendation rec = r.clone();
 								if (cl.isTransition)
 									rec.skipLabels.add(cl.label);
@@ -226,37 +222,14 @@ public class GoldrattRepairRecommendationSearch extends RepairRecommendationSear
 								recs.add(rec);
 							}
 						}
+						else 
+							break;
 					}
 				}
 			}
 			if (debug) System.out.println("DEBUG> Repair recommendations: " + recs);
 			
-			/*for (RepairRecommendation rec : recs) {
-				Map<Transition,Integer>  tempMOS	= new HashMap<Transition,Integer>(this.costFuncMOS);
-				Map<XEventClass,Integer> tempMOT	= new HashMap<XEventClass,Integer>(this.costFuncMOT);
-				this.adjustCostFuncMOS(tempMOS,rec.getSkipLabels());
-				this.adjustCostFuncMOT(tempMOT,rec.getInsertLabels());
-				
-				// compute cost
-				int cost = this.computeCost(tempMOS, tempMOT);
-				if (this.debug) System.out.println(String.format("DEBUG> %s : %s", rec, cost));
-			}*/
-			
-			
 		} while (!recs.isEmpty());
-		
-		/*if (this.debug) System.out.println(String.format("----"));
-		for (RepairRecommendation rec : this.optimalRepairRecommendations) {
-			Map<Transition,Integer>  tempMOS	= new HashMap<Transition,Integer>(this.costFuncMOS);
-			Map<XEventClass,Integer> tempMOT	= new HashMap<XEventClass,Integer>(this.costFuncMOT);
-			this.adjustCostFuncMOS(tempMOS,rec.getSkipLabels());
-			this.adjustCostFuncMOT(tempMOT,rec.getInsertLabels());
-			
-			// compute cost
-			int cost = this.computeCost(tempMOS, tempMOT);
-			if (this.debug) System.out.println(String.format("DEBUG> %s : %s", rec, cost));
-		}
-		if (this.debug) System.out.println(String.format("----"));*/
 		
 		RepairRecommendation rec = this.optimalRepairRecommendations.iterator().next();
 		
@@ -265,7 +238,7 @@ public class GoldrattRepairRecommendationSearch extends RepairRecommendationSear
 		this.adjustCostFuncMOS(tempMOS,rec.getSkipLabels());
 		this.adjustCostFuncMOT(tempMOT,rec.getInsertLabels());
 		
-		this.optimalCost = this.computeCost(tempMOS, tempMOT);
+		this.optimalCost = this.computeCost(tempMOS,tempMOT);
 		
 		return this.optimalRepairRecommendations;
 	}

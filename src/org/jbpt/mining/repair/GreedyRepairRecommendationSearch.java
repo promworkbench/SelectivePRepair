@@ -37,16 +37,12 @@ public class GreedyRepairRecommendationSearch extends RepairRecommendationSearch
 		return this.computeOptimalRepairRecommendations(constraint,true);
 	}
 
-	public Set<RepairRecommendation> computeOptimalRepairRecommendations(RepairConstraint constraint, boolean considerAllExtensions) {
+	public Set<RepairRecommendation> computeOptimalRepairRecommendations(RepairConstraint constraint, boolean considerAll) {
 		this.alignmentCostComputations	= 0;
 		this.optimalRepairRecommendations.clear();
 				
 		// cost of alignment to start with
 		this.optimalCost = this.computeCost(this.costFuncMOS, this.costFuncMOT);
-		
-		/* OLD:
-		 * Set<String> labels = CostFunction.getLabels(this.log,this.eventClassifier);
-		labels.addAll(CostFunction.getLabels(this.net));*/
 		
 		Set<String> labelsI = CostFunction.getLabels(this.log,this.eventClassifier);
 		Set<String> labelsS = CostFunction.getLabels(this.net);
@@ -58,14 +54,15 @@ public class GreedyRepairRecommendationSearch extends RepairRecommendationSearch
 		
 		do {
 			if (debug) System.out.println("DEBUG> Alignment computations: "+this.alignmentCostComputations);
-			if (this.optimalCost<=0) break;
+			
 			this.optimalRepairRecommendations.clear();
 			
-			if (considerAllExtensions)
+			//if (considerAll)
 				this.optimalRepairRecommendations.addAll(recs);
-			else
-				this.optimalRepairRecommendations.add(recs.iterator().next());
+			//else
+				//this.optimalRepairRecommendations.add(recs.iterator().next());
 				
+			if (this.optimalCost<=0) break; //!!!!
 			recs.clear();
 			
 			for (RepairRecommendation r : this.optimalRepairRecommendations) {
@@ -86,7 +83,7 @@ public class GreedyRepairRecommendationSearch extends RepairRecommendationSearch
 					int cost = this.computeCost(tempMOS, tempMOT);
 					
 					if (cost<=this.optimalCost) {
-						if (cost<this.optimalCost) recs.clear();
+						if (cost<this.optimalCost || !considerAll) recs.clear();
 						recs.add(rec);
 						this.optimalCost = cost;
 					}
@@ -109,7 +106,7 @@ public class GreedyRepairRecommendationSearch extends RepairRecommendationSearch
 					int cost = this.computeCost(tempMOS, tempMOT);
 					
 					if (cost<=this.optimalCost) {
-						if (cost<this.optimalCost) recs.clear();
+						if (cost<this.optimalCost || !considerAll) recs.clear();
 						recs.add(rec);
 						this.optimalCost = cost;
 					}
@@ -118,7 +115,7 @@ public class GreedyRepairRecommendationSearch extends RepairRecommendationSearch
 			
 		} while (!recs.isEmpty());
 		
-		this.backtrackOptimalRepairRecommendations();
+		//this.backtrackOptimalRepairRecommendations();
 		
 		return this.optimalRepairRecommendations;
 	}
