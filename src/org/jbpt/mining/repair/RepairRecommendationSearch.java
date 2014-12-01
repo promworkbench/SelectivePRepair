@@ -282,7 +282,9 @@ public abstract class RepairRecommendationSearch {
 		
 		NetSystem sys = this.constructNetSystem(this.net,mapX,mapY);
 		
+		// TODO
 		org.jbpt.petri.Place start = sys.getSourcePlaces().iterator().next();
+		
 		org.jbpt.petri.Place end = sys.getSinkPlaces().iterator().next();
 		
 		for (SyncReplayResult res : result) {
