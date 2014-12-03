@@ -331,7 +331,7 @@ public class RepairRecommendationSearchExpCSV {
 		Map<XEventClass,Integer> costMOT = null; // movements on trace
 		TransEvClassMapping mapping = null;
 		boolean debug = false;
-		int maxRepairResources = 20;
+		int maxRepairResources = 100;
 		
 		List<String> Logs = new ArrayList<>();
 		Logs.add("AO");
@@ -351,17 +351,32 @@ public class RepairRecommendationSearchExpCSV {
 		Logs.add("BPI2014all100");
 		Logs.add("BPI2014all90");
 		Logs.add("BPI2014all80");
+	
 		
-		// experiment
+		
+		// EXPERIMENT
 		System.out.println("Alg.,Log,Net,Res,Time,Recs,Recs#,Comp#,Cost,Correct");
-		//for (Map.Entry<String,List<String>> entry : log2nets.entrySet()) {
+
+		Map<RR_SEARCH_ALGORITHM,Integer> alg2lastCost = new HashMap<>();
 		for (String logFile : Logs) {
-			//String logFile = entry.getKey();
+			log = XLogReader.openLog("./exp/"+logFile+".xes.gz");
+			
 			List<String> netFiles = log2nets.get(logFile);
-			//for (String netFile : entry.getValue()) {
 			for (String netFile : netFiles) {
+				
+				alg2lastCost.put(RR_SEARCH_ALGORITHM.BF, Integer.MAX_VALUE);
+				alg2lastCost.put(RR_SEARCH_ALGORITHM.BF2, Integer.MAX_VALUE);
+				alg2lastCost.put(RR_SEARCH_ALGORITHM.GOLDRATT_ALL, Integer.MAX_VALUE);
+				alg2lastCost.put(RR_SEARCH_ALGORITHM.GOLDRATT_ONE, Integer.MAX_VALUE);
+				alg2lastCost.put(RR_SEARCH_ALGORITHM.GREEDY_ALL, Integer.MAX_VALUE);
+				alg2lastCost.put(RR_SEARCH_ALGORITHM.GREEDY_ONE, Integer.MAX_VALUE);
+				alg2lastCost.put(RR_SEARCH_ALGORITHM.KNAPSACK_ALL, Integer.MAX_VALUE);
+				alg2lastCost.put(RR_SEARCH_ALGORITHM.KNAPSACK_ONE, Integer.MAX_VALUE);
+				
 				for (int res=0; res<=maxRepairResources; res++) {
 					for (RR_SEARCH_ALGORITHM alg : algs) {
+						if (alg2lastCost.get(alg)==0) continue;
+						
 						System.out.print(alg+",");
 						System.out.print(logFile+",");
 						System.out.print(netFile+",");
@@ -370,17 +385,11 @@ public class RepairRecommendationSearchExpCSV {
 							net = constructNet("./exp/"+netFile+".pnml");
 							initialMarking = getInitialMarking(net);
 							finalMarkings = getFinalMarkings(net);
-							log = XLogReader.openLog("./exp/"+logFile+".xes.gz");
 							costMOS = constructMOSCostFunction(net);
 							XEventClass dummyEvClass = new XEventClass("DUMMY",99999);
 							XEventClassifier eventClassifier = log2classifier.get(logFile);
 							costMOT = constructMOTCostFunction(net,log,eventClassifier,dummyEvClass);
 							mapping = constructMapping(net,log,dummyEvClass, eventClassifier);
-							
-							//System.out.println("Initial marking: "+initialMarking);
-							//System.out.println("Final markings: "+Arrays.toString(finalMarkings));
-							//System.out.println("MOS costs: "+costMOS);
-							//System.out.println("MOT costs: "+costMOT);
 							
 							boolean considerAll = true;
 							switch (alg) {
@@ -404,13 +413,9 @@ public class RepairRecommendationSearchExpCSV {
 									considerAll = false;
 									rrSearch = new KnapsackRepairRecommendationSearch(net, initialMarking, finalMarkings, log, costMOS, costMOT, mapping, eventClassifier, debug);
 									break;
-								default :
+								default:
 									break;
 							}
-							
-							//String originalName = String.format("exp/%s.BEFORE.pnml",netFile);
-							//rrSearch.serializeNet(net,originalName);
-							//System.out.println("Original net serialized in: "+originalName);
 							
 							Set<String> netLabels = CostFunction.getLabels(net);
 							Set<String> logLabels = CostFunction.getLabels(log,eventClassifier);
@@ -419,8 +424,6 @@ public class RepairRecommendationSearchExpCSV {
 							Map<String,Integer> skipCosts = CostFunction.getStdCostFunctionOnLabels(netLabels);
 							RepairConstraint constraint = new RepairConstraint(insertCosts,skipCosts,res);
 							
-							//System.out.println("Insert costs: "+insertCosts);
-							//System.out.println("Skip costs: "+skipCosts);
 							System.out.print(res+",");
 							
 							long start = System.nanoTime();
@@ -434,6 +437,8 @@ public class RepairRecommendationSearchExpCSV {
 							int optCost=rrSearch.getOptimalCost();
 							System.out.print(optCost+",");
 							
+							alg2lastCost.put(alg,optCost);
+							
 							boolean good = true;
 							int count = 0;
 							for (RepairRecommendation rec : recs) {
@@ -442,7 +447,6 @@ public class RepairRecommendationSearchExpCSV {
 								PetrinetGraph repaired = rrSearch.repair(rec);
 								rrSearch.serializeNet(repaired,repairedName);
 								
-								//System.out.println("Repaired net serialized in: "+repairedName+" after applying "+rec);
 								count++;
 								
 								// check cost
@@ -484,8 +488,7 @@ public class RepairRecommendationSearchExpCSV {
 			}
 		}
 		
-		//System.out.println("----------------------------------------");
-		//System.out.println("DONE!");
+		System.out.println("DONE!");
 	}
 
 	private static TransEvClassMapping constructMapping(PetrinetGraph net, XLog log, XEventClass dummyEvClass, XEventClassifier eventClassifier) {

@@ -28,7 +28,7 @@ import org.processmining.models.graphbased.directed.petrinet.elements.Place;
 import org.processmining.models.graphbased.directed.petrinet.elements.Transition;
 import org.processmining.models.graphbased.directed.petrinet.impl.PetrinetFactory;
 import org.processmining.models.semantics.petrinet.Marking;
-import org.processmining.plugins.astar.petrinet.PetrinetReplayerWithILP;
+import org.processmining.plugins.astar.petrinet.PetrinetReplayerWithoutILP;
 import org.processmining.plugins.connectionfactories.logpetrinet.TransEvClassMapping;
 import org.processmining.plugins.petrinet.replayer.algorithms.IPNReplayParameter;
 import org.processmining.plugins.petrinet.replayer.algorithms.costbasedcomplete.CostBasedCompleteParam;
@@ -237,7 +237,7 @@ public abstract class RepairRecommendationSearch {
 		this.adjustCostFuncMOS(tempMOS,rec.getSkipLabels());
 		this.adjustCostFuncMOT(tempMOT,rec.getInsertLabels());
 		
-		PetrinetReplayerWithILP replayEngine = new PetrinetReplayerWithILP();		
+		PetrinetReplayerWithoutILP replayEngine = new PetrinetReplayerWithoutILP();		
 		
 		
 		IPNReplayParameter parameters = new CostBasedCompleteParam(tempMOT,tempMOS);
@@ -480,7 +480,7 @@ public abstract class RepairRecommendationSearch {
 	}*/
 	
 	public int computeCost(Map<Transition,Integer> costMOS, Map<XEventClass,Integer> costMOT) {
-		PetrinetReplayerWithILP replayEngine = new PetrinetReplayerWithILP();		
+		PetrinetReplayerWithoutILP replayEngine = new PetrinetReplayerWithoutILP();		
 		//AllOptAlignmentsGraphAlg replayEngine = new AllOptAlignmentsGraphAlg();
 		//AllOptAlignmentsGraphILPAlg replayEngine = new AllOptAlignmentsGraphILPAlg();
 		//AllOptAlignmentsTreeAlg replayEngine = new AllOptAlignmentsTreeAlg();
@@ -514,7 +514,7 @@ public abstract class RepairRecommendationSearch {
 	}
 	
 	public Map<AlignmentStep,Integer> computeFrequencies(Map<Transition,Integer> t2c, Map<XEventClass,Integer> e2c) {
-		PetrinetReplayerWithILP replayEngine = new PetrinetReplayerWithILP();		
+		PetrinetReplayerWithoutILP replayEngine = new PetrinetReplayerWithoutILP();		
 		//AllOptAlignmentsGraphAlg replayEngine = new AllOptAlignmentsGraphAlg();
 		//AllOptAlignmentsGraphILPAlg replayEngine = new AllOptAlignmentsGraphILPAlg();
 		//AllOptAlignmentsTreeAlg replayEngine = new AllOptAlignmentsTreeAlg();
@@ -557,6 +557,67 @@ public abstract class RepairRecommendationSearch {
 		} catch (AStarException e) {
 			e.printStackTrace();
 		}
+		
+		this.alignmentCostComputations++;
+		
+		return map;
+	}
+	
+	public Map<AlignmentStep,Integer> computeFrequenciesAndCost(Map<Transition,Integer> t2c, Map<XEventClass,Integer> e2c) {
+		PetrinetReplayerWithoutILP replayEngine = new PetrinetReplayerWithoutILP();		
+		//AllOptAlignmentsGraphAlg replayEngine = new AllOptAlignmentsGraphAlg();
+		//AllOptAlignmentsGraphILPAlg replayEngine = new AllOptAlignmentsGraphILPAlg();
+		//AllOptAlignmentsTreeAlg replayEngine = new AllOptAlignmentsTreeAlg();
+		//CostBasedCompletePruneAlg replayEngine = new CostBasedCompletePruneAlg();
+		
+		IPNReplayParameter parameters = new CostBasedCompleteParam(e2c,t2c);
+		parameters.setInitialMarking(this.initMarking);
+		parameters.setFinalMarkings(this.finalMarkings[0]);
+		parameters.setGUIMode(false);
+		parameters.setCreateConn(false);
+		
+		Map<AlignmentStep,Integer> map = new HashMap<AlignmentStep, Integer>();
+		try {
+			PNRepResult result = replayEngine.replayLog(context, net, log, mapping, parameters);
+		
+			this.optimalCost = 0;
+			for (SyncReplayResult res : result) {
+				List<Object> nodeInstance = res.getNodeInstance();
+				List<StepTypes> stepTypes = res.getStepTypes();
+				
+				for (int i=0; i<nodeInstance.size(); i++) {
+					StepTypes type = stepTypes.get(i);
+					if (type==StepTypes.LMGOOD) continue;
+					
+					AlignmentStep step = new AlignmentStep();
+					step.name = nodeInstance.get(i);
+					step.type = type;
+					
+					Integer c = map.get(step);
+					if (c==null)
+						map.put(step,res.getTraceIndex().size());
+					else
+						map.put(step,c+res.getTraceIndex().size());
+				}
+				
+				this.optimalCost += res.getInfo().get("Raw Fitness Cost") * res.getTraceIndex().size();
+			}	
+		} catch (AStarException e) {
+			e.printStackTrace();
+		}
+		
+		/*
+		 * int cost = 0;
+		try {
+			PNRepResult result = replayEngine.replayLog(context, net, log, mapping, parameters);
+			
+			for (SyncReplayResult res : result) {
+				cost += res.getInfo().get("Raw Fitness Cost") * res.getTraceIndex().size();
+			}
+		} catch (AStarException e) {
+			e.printStackTrace();
+		}
+		 */
 		
 		this.alignmentCostComputations++;
 		

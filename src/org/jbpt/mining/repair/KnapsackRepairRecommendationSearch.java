@@ -52,7 +52,7 @@ public class KnapsackRepairRecommendationSearch extends RepairRecommendationSear
 		this.optimalRepairRecommendations.clear();
 		
 		// get movement frequencies 
-		Map<AlignmentStep,Integer> frequencies = this.computeFrequencies(this.costFuncMOS, this.costFuncMOT);
+		Map<AlignmentStep,Integer> frequencies = this.computeFrequenciesAndCost(this.costFuncMOS, this.costFuncMOT);
 		if (debug) System.out.println("DEBUG> Movement frequencies:" + frequencies);
 		
 		Map<Transition,Integer>	 costFuncMOSw = new HashMap<Transition, Integer>();
@@ -178,8 +178,14 @@ public class KnapsackRepairRecommendationSearch extends RepairRecommendationSear
 		this.adjustCostFuncMOS(tempMOS,rec.getSkipLabels());
 		this.adjustCostFuncMOT(tempMOT,rec.getInsertLabels());
 		
-		this.optimalCost = this.computeCost(tempMOS, tempMOT);
-		
+		if (constraint.getAvailableResources()>0) {
+			this.optimalCost = this.computeCost(tempMOS, tempMOT);
+		}
+		else {
+			this.optimalRepairRecommendations.clear();
+			this.optimalRepairRecommendations.add(new RepairRecommendation());
+		}
+			
 		return this.optimalRepairRecommendations;
 	}
 	
