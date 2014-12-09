@@ -47,7 +47,7 @@ public class GoldrattRepairRecommendationSearch extends RepairRecommendationSear
 		this.adjustCostFuncMOS(tempMOS,r.getSkipLabels());
 		this.adjustCostFuncMOT(tempMOT,r.getInsertLabels());
 		
-		Map<AlignmentStep,Integer> frequencies = this.computeFrequencies(tempMOS,tempMOT);
+		Map<AlignmentStep,Integer> frequencies = this.computeFrequenciesAndCost(tempMOS,tempMOT);
 		this.updateFrequencies(frequencies,r);
 		
 		Map<Transition,Integer>	 costFuncMOSw = new HashMap<Transition, Integer>();
@@ -144,6 +144,8 @@ public class GoldrattRepairRecommendationSearch extends RepairRecommendationSear
 		return labels;
 	}
 	
+	private Map<RepairRecommendation,Integer> rr2cost = new HashMap<RepairRecommendation,Integer>();
+	
 	@Override
 	public Set<RepairRecommendation> computeOptimalRepairRecommendations(RepairConstraint constraint, boolean considerAll) {
 		this.alignmentCostComputations = 0;
@@ -153,11 +155,12 @@ public class GoldrattRepairRecommendationSearch extends RepairRecommendationSear
 		RepairRecommendation recommendation	= new RepairRecommendation();
 		recs.add(recommendation);
 		
+		this.rr2cost.clear();
+		
 		do {
 			this.optimalRepairRecommendations.clear();
 			this.optimalRepairRecommendations.addAll(recs);
-			
-			if (constraint.getAvailableResources()<=0) break;
+
 			recs.clear();
 			
 			int investRes = Integer.MIN_VALUE; 
@@ -166,7 +169,9 @@ public class GoldrattRepairRecommendationSearch extends RepairRecommendationSear
 			for (RepairRecommendation r : this.optimalRepairRecommendations) {
 				if (debug) System.out.println("DEBUG> Current repair recomendation: " + r);
 				
-				List<Label> labels = prepare(r,constraint); 						// compute alignment and rank labels
+				List<Label> labels = prepare(r,constraint); 						// compute alignment and rank labels and cost of r!
+				rr2cost.put(r, this.optimalCost);
+				if (constraint.getAvailableResources()<=0) break;
 				double usedRes = CostFunction.getRequiredResources(constraint, r);	// so far used resources
 				
 				Iterator<Label> i = labels.iterator();
@@ -231,14 +236,22 @@ public class GoldrattRepairRecommendationSearch extends RepairRecommendationSear
 			
 		} while (!recs.isEmpty());
 		
-		RepairRecommendation rec = this.optimalRepairRecommendations.iterator().next();
+		int maxCost = Integer.MAX_VALUE;
+		for (RepairRecommendation r : this.optimalRepairRecommendations) {
+			int cost = rr2cost.get(r);
+			if (cost < maxCost) {
+				maxCost = cost;
+				recs.clear();
+				recs.add(r);
+			}
+			else if (cost==maxCost) {
+				recs.add(r);
+			}
+		}
 		
-		Map<Transition,Integer>  tempMOS	= new HashMap<Transition,Integer>(this.costFuncMOS);
-		Map<XEventClass,Integer> tempMOT	= new HashMap<XEventClass,Integer>(this.costFuncMOT);
-		this.adjustCostFuncMOS(tempMOS,rec.getSkipLabels());
-		this.adjustCostFuncMOT(tempMOT,rec.getInsertLabels());
-		
-		this.optimalCost = this.computeCost(tempMOS,tempMOT);
+		this.optimalRepairRecommendations.clear();
+		this.optimalRepairRecommendations.addAll(recs);
+		this.optimalCost = maxCost; 
 		
 		return this.optimalRepairRecommendations;
 	}

@@ -21,7 +21,7 @@ import org.processmining.models.graphbased.directed.petrinet.elements.Place;
 import org.processmining.models.graphbased.directed.petrinet.elements.Transition;
 import org.processmining.models.graphbased.directed.petrinet.impl.PetrinetFactory;
 import org.processmining.models.semantics.petrinet.Marking;
-import org.processmining.plugins.astar.petrinet.PetrinetReplayerWithILP;
+import org.processmining.plugins.astar.petrinet.PetrinetReplayerWithoutILP;
 import org.processmining.plugins.connectionfactories.logpetrinet.TransEvClassMapping;
 import org.processmining.plugins.petrinet.replayer.algorithms.IPNReplayParameter;
 import org.processmining.plugins.petrinet.replayer.algorithms.costbasedcomplete.CostBasedCompleteParam;
@@ -44,10 +44,10 @@ public class AlignmentTest {
 			Map<XEventClass,Integer> costMOT = null; // movements on trace
 			TransEvClassMapping mapping = null;
 			
-			net = constructNet("./exp/REPAIRED.KNAPSACK_ONE.BPI2013all90_induct_0_9.BPI2013all90.2.0.2702.pnml");
+			net = constructNet("./exp/REPAIRED.GREEDY_ALL.BPI2012all100_induct_1_0.BPI2012all100.11.0.41764.pnml");
 			initialMarking = getInitialMarking(net);
 			finalMarkings = getFinalMarkings(net);
-			log = XLogReader.openLog("./exp/BPI2013all90.xes.gz");
+			log = XLogReader.openLog("./exp/BPI2012all100.xes.gz");
 			costMOS = constructMOSCostFunction(net);
 			XEventClass dummyEvClass = new XEventClass("DUMMY",99999);
 			XEventClassifier eventClassifier = XLogInfoImpl.STANDARD_CLASSIFIER;
@@ -57,14 +57,12 @@ public class AlignmentTest {
 			int cost = AlignmentTest.computeCost(costMOS, costMOT, initialMarking, finalMarkings, context, net, log, mapping);
 			
 			System.out.println(i + ":\t" + cost);
-			
-			
 		}
 
 	}
 	
 	public static int computeCost(Map<Transition,Integer> costMOS, Map<XEventClass,Integer> costMOT, Marking initialMarking, Marking[] finalMarkings, DummyUIPluginContext context, PetrinetGraph net, XLog log, TransEvClassMapping mapping) {
-		PetrinetReplayerWithILP replayEngine = new PetrinetReplayerWithILP();		
+		PetrinetReplayerWithoutILP replayEngine = new PetrinetReplayerWithoutILP();		
 		
 		IPNReplayParameter parameters = new CostBasedCompleteParam(costMOT,costMOS);
 		parameters.setInitialMarking(initialMarking);

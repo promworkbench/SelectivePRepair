@@ -36,7 +36,7 @@ import ee.ut.prom.XLogReader;
 /**
  * @author Artem Polyvyanyy
  */
-public class RepairRecommendationSearchExpCSV {
+public class RepairRecommendationSearchExpCSVDebug {
 	
 	private enum RR_SEARCH_ALGORITHM {BF,BF2,GREEDY_ALL,GREEDY_ONE,GOLDRATT_ALL,GOLDRATT_ONE,KNAPSACK_ALL,KNAPSACK_ONE};
 
@@ -52,7 +52,7 @@ public class RepairRecommendationSearchExpCSV {
 		aoNet.add("AO");
 		
 		// AO nets - DONE
-		List<String> aoNets = new ArrayList<String>();
+		/*List<String> aoNets = new ArrayList<String>();
 		aoNets.add("AO_induct_1_0");
 		aoNets.add("AO_induct_0_9");
 		aoNets.add("AO_induct_0_8");
@@ -91,24 +91,24 @@ public class RepairRecommendationSearchExpCSV {
 		BPI2013all90Nets.add("BPI2013all90_induct_0_3");
 		BPI2013all90Nets.add("BPI2013all90_induct_0_2");
 		BPI2013all90Nets.add("BPI2013all90_induct_0_1");
-		BPI2013all90Nets.add("BPI2013all90_induct_0_0");
+		BPI2013all90Nets.add("BPI2013all90_induct_0_0");*/
 		
 		// BPI2013all80 nets - DONE
 		List<String> BPI2013all80Nets = new ArrayList<String>();
-		BPI2013all80Nets.add("BPI2013all80_induct_1_0");
+		/*BPI2013all80Nets.add("BPI2013all80_induct_1_0");
 		BPI2013all80Nets.add("BPI2013all80_induct_0_9");
 		BPI2013all80Nets.add("BPI2013all80_induct_0_8");
 		BPI2013all80Nets.add("BPI2013all80_induct_0_7");
 		BPI2013all80Nets.add("BPI2013all80_induct_0_6");
-		BPI2013all80Nets.add("BPI2013all80_induct_0_5");
+		BPI2013all80Nets.add("BPI2013all80_induct_0_5");*/
 		BPI2013all80Nets.add("BPI2013all80_induct_0_4");
-		BPI2013all80Nets.add("BPI2013all80_induct_0_3");
+		/*BPI2013all80Nets.add("BPI2013all80_induct_0_3");
 		BPI2013all80Nets.add("BPI2013all80_induct_0_2");
 		BPI2013all80Nets.add("BPI2013all80_induct_0_1");
-		BPI2013all80Nets.add("BPI2013all80_induct_0_0");
+		BPI2013all80Nets.add("BPI2013all80_induct_0_0");*/
 		
 		// BPI2012all100 nets - DONE
-		List<String> BPI2012all100Nets = new ArrayList<String>();
+		/*List<String> BPI2012all100Nets = new ArrayList<String>();
 		BPI2012all100Nets.add("BPI2012all100_induct_1_0");
 		BPI2012all100Nets.add("BPI2012all100_induct_0_9");
 		BPI2012all100Nets.add("BPI2012all100_induct_0_8");
@@ -273,53 +273,53 @@ public class RepairRecommendationSearchExpCSV {
 		BPI2014all80Nets.add("BPI2014all80_induct_0_3");
 		BPI2014all80Nets.add("BPI2014all80_induct_0_2");
 		BPI2014all80Nets.add("BPI2014all80_induct_0_1");
-		BPI2014all80Nets.add("BPI2014all80_induct_0_0");	
+		BPI2014all80Nets.add("BPI2014all80_induct_0_0");*/
 		
 		
 		// log2nets
-		log2nets.put("AO",aoNet);							// DONE
-		log2nets.put("AO2",aoNets);							// DONE
-		log2nets.put("BPI2013all100",BPI2013all100Nets);	// DONE
-		log2nets.put("BPI2013all90",BPI2013all90Nets);		// DONE
-		log2nets.put("BPI2013all80",BPI2013all80Nets); 		// DONE
-		log2nets.put("BPI2012all100",BPI2012all100Nets); 	// DONE
-		log2nets.put("BPI2012all90",BPI2012all90Nets); 		// DONE
-		log2nets.put("BPI2012all80",BPI2012all80Nets); 		// DONE
-		log2nets.put("BPI2012comp100",BPI2012comp100Nets);	// DONE
-		log2nets.put("BPI2012comp90",BPI2012comp90Nets); 	// DONE
-		log2nets.put("BPI2012comp80",BPI2012comp80Nets); 	// DONE
-		log2nets.put("BPI2011all100",BPI2011all100Nets); 	// DONE
-		log2nets.put("BPI2011all90",BPI2011all90Nets); 		// DONE
-		log2nets.put("BPI2011all80",BPI2011all80Nets); 		// DONE
-		log2nets.put("BPI2014all80",BPI2014all80Nets); 		// DONE
-		log2nets.put("BPI2014all90",BPI2014all90Nets); 		// DONE
-		log2nets.put("BPI2014all100",BPI2014all100Nets); 	// DONE
-		
+		log2nets.put("AO",aoNet); // DONE
+		/*log2nets.put("AO2",aoNets); // DONE
+		log2nets.put("BPI2013all100",BPI2013all100Nets); // DONE
+		log2nets.put("BPI2013all90",BPI2013all90Nets);*/ // DONE
+		//log2nets.put("BPI2013all80",BPI2013all80Nets); // DONE
+		/*log2nets.put("BPI2012all100",BPI2012all100Nets); // DONE
+		log2nets.put("BPI2012all90",BPI2012all90Nets); // DONE
+		log2nets.put("BPI2012all80",BPI2012all80Nets); // DONE
+		log2nets.put("BPI2012comp100",BPI2012comp100Nets); // DONE
+		log2nets.put("BPI2012comp90",BPI2012comp90Nets); // DONE
+		log2nets.put("BPI2012comp80",BPI2012comp80Nets); // DONE
+		log2nets.put("BPI2011all100",BPI2011all100Nets); // DONE
+		log2nets.put("BPI2011all90",BPI2011all90Nets); // DONE
+		log2nets.put("BPI2011all80",BPI2011all80Nets); // DONE
+		log2nets.put("BPI2014all80",BPI2014all80Nets); // DONE
+		log2nets.put("BPI2014all90",BPI2014all90Nets); // DONE
+		log2nets.put("BPI2014all100",BPI2014all100Nets); // DONE
+*/		
 		// log2classifier
-		log2classifier.put("AO",XLogInfoImpl.NAME_CLASSIFIER);					// DONE
-		log2classifier.put("AO2",XLogInfoImpl.STANDARD_CLASSIFIER);				// DONE
-		log2classifier.put("BPI2013all100",XLogInfoImpl.STANDARD_CLASSIFIER);	// DONE
-		log2classifier.put("BPI2013all90",XLogInfoImpl.STANDARD_CLASSIFIER);	// DONE
-		log2classifier.put("BPI2013all80",XLogInfoImpl.STANDARD_CLASSIFIER);	// DONE
-		log2classifier.put("BPI2012all100",XLogInfoImpl.STANDARD_CLASSIFIER);	// DONE
-		log2classifier.put("BPI2012all90",XLogInfoImpl.STANDARD_CLASSIFIER);	// DONE
-		log2classifier.put("BPI2012all80",XLogInfoImpl.STANDARD_CLASSIFIER);	// DONE
-		log2classifier.put("BPI2012comp100",XLogInfoImpl.STANDARD_CLASSIFIER);	// DONE
-		log2classifier.put("BPI2012comp90",XLogInfoImpl.STANDARD_CLASSIFIER);	// DONE
-		log2classifier.put("BPI2012comp80",XLogInfoImpl.STANDARD_CLASSIFIER);	// DONE
-		log2classifier.put("BPI2011all100",XLogInfoImpl.STANDARD_CLASSIFIER);	// DONE
-		log2classifier.put("BPI2011all90",XLogInfoImpl.STANDARD_CLASSIFIER);	// DONE
-		log2classifier.put("BPI2011all80",XLogInfoImpl.STANDARD_CLASSIFIER);	// DONE
-		log2classifier.put("BPI2014all100",XLogInfoImpl.NAME_CLASSIFIER);		// DONE
-		log2classifier.put("BPI2014all90",XLogInfoImpl.NAME_CLASSIFIER);		// DONE
-		log2classifier.put("BPI2014all80",XLogInfoImpl.NAME_CLASSIFIER);		// DONE
+		log2classifier.put("AO",XLogInfoImpl.NAME_CLASSIFIER); // DONE
+		log2classifier.put("AO2",XLogInfoImpl.STANDARD_CLASSIFIER); // DONE
+		log2classifier.put("BPI2013all100",XLogInfoImpl.STANDARD_CLASSIFIER); // DONE
+		log2classifier.put("BPI2013all90",XLogInfoImpl.STANDARD_CLASSIFIER); // DONE
+		log2classifier.put("BPI2013all80",XLogInfoImpl.STANDARD_CLASSIFIER); // DONE
+		log2classifier.put("BPI2012all100",XLogInfoImpl.STANDARD_CLASSIFIER); // DONE
+		log2classifier.put("BPI2012all90",XLogInfoImpl.STANDARD_CLASSIFIER); // DONE
+		log2classifier.put("BPI2012all80",XLogInfoImpl.STANDARD_CLASSIFIER); // DONE
+		log2classifier.put("BPI2012comp100",XLogInfoImpl.STANDARD_CLASSIFIER); // DONE
+		log2classifier.put("BPI2012comp90",XLogInfoImpl.STANDARD_CLASSIFIER); // DONE
+		log2classifier.put("BPI2012comp80",XLogInfoImpl.STANDARD_CLASSIFIER); // DONE
+		log2classifier.put("BPI2011all100",XLogInfoImpl.STANDARD_CLASSIFIER); // DONE
+		log2classifier.put("BPI2011all90",XLogInfoImpl.STANDARD_CLASSIFIER); // DONE
+		log2classifier.put("BPI2011all80",XLogInfoImpl.STANDARD_CLASSIFIER); // DONE
+		log2classifier.put("BPI2014all100",XLogInfoImpl.NAME_CLASSIFIER); // DONE
+		log2classifier.put("BPI2014all90",XLogInfoImpl.NAME_CLASSIFIER); // DONE
+		log2classifier.put("BPI2014all80",XLogInfoImpl.NAME_CLASSIFIER); // DONE
 		
 		// algorithms
-		algs.add(RR_SEARCH_ALGORITHM.KNAPSACK_ONE);
+		//algs.add(RR_SEARCH_ALGORITHM.KNAPSACK_ONE);
 		algs.add(RR_SEARCH_ALGORITHM.GOLDRATT_ALL);
-		algs.add(RR_SEARCH_ALGORITHM.GOLDRATT_ONE);
-		algs.add(RR_SEARCH_ALGORITHM.GREEDY_ALL);
-		algs.add(RR_SEARCH_ALGORITHM.GREEDY_ONE);
+		//algs.add(RR_SEARCH_ALGORITHM.GOLDRATT_ONE);
+		//algs.add(RR_SEARCH_ALGORITHM.GREEDY_ALL);
+		//algs.add(RR_SEARCH_ALGORITHM.GREEDY_ONE);
 		
 		// preparation
 		RepairRecommendationSearch rrSearch = null;
@@ -331,15 +331,15 @@ public class RepairRecommendationSearchExpCSV {
 		Map<XEventClass,Integer> costMOT = null; // movements on trace
 		TransEvClassMapping mapping = null;
 		boolean debug = false;
-		int maxRepairResources = 15;
+		int maxRepairResources = 5;
 		
 		List<String> Logs = new ArrayList<>();
 		Logs.add("AO");
-		Logs.add("AO2");
+		/*Logs.add("AO2");
 		Logs.add("BPI2013all100");
-		Logs.add("BPI2013all90");
-		Logs.add("BPI2013all80");
-		Logs.add("BPI2012all100");
+		Logs.add("BPI2013all90");*/
+		//Logs.add("BPI2013all80");
+		/*Logs.add("BPI2012all100");
 		Logs.add("BPI2012all90");
 		Logs.add("BPI2012all80");
 		Logs.add("BPI2012comp100");
@@ -350,7 +350,7 @@ public class RepairRecommendationSearchExpCSV {
 		Logs.add("BPI2011all80");
 		Logs.add("BPI2014all100");
 		Logs.add("BPI2014all90");
-		Logs.add("BPI2014all80");
+		Logs.add("BPI2014all80");*/
 	
 		
 		
