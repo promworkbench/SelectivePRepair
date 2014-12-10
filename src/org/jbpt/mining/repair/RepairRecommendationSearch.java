@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
+import java.util.Vector;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 import nl.tue.astar.AStarException;
@@ -13,6 +14,7 @@ import nl.tue.astar.AStarException;
 import org.deckfour.xes.classification.XEventClass;
 import org.deckfour.xes.classification.XEventClassifier;
 import org.deckfour.xes.model.XLog;
+import org.jbpt.mining.HittingSets;
 import org.jbpt.petri.NetSystem;
 import org.jbpt.petri.Node;
 import org.jbpt.petri.io.PNMLSerializer;
@@ -292,6 +294,137 @@ public abstract class RepairRecommendationSearch {
 		Map<String,Set<org.jbpt.petri.Place>> labels2places = new HashMap<String,Set<org.jbpt.petri.Place>>();
 		
 		for (Map.Entry<String,Set<Set<org.jbpt.petri.Place>>> entry : labels2markings.entrySet()) {
+			
+			Vector<Vector<org.jbpt.petri.Place>> v = new Vector<Vector<org.jbpt.petri.Place>>();
+			for (Set<org.jbpt.petri.Place> m : entry.getValue()) {
+				Vector<org.jbpt.petri.Place> a = new Vector<org.jbpt.petri.Place>(m);
+				v.add(a);
+			}
+			
+			HittingSets hs = new HittingSets(v); // selects random minimal hitting set 
+			
+			int max = Integer.MAX_VALUE;
+			Vector<org.jbpt.petri.Place> ps = null;
+			@SuppressWarnings("unchecked")
+			Vector<Vector<org.jbpt.petri.Place>> s = hs.getSets();
+			for (int i=0; i<s.size(); i++) {
+				Vector<org.jbpt.petri.Place> k = s.get(i);
+				if (k.size()<max) {
+					max = k.size();
+					ps = k;
+				}
+			}
+						
+			labels2places.put(entry.getKey(),new HashSet<org.jbpt.petri.Place>(ps));
+		}
+		
+		// PERFORM REPAIRS
+		
+		Map<DirectedGraphElement,DirectedGraphElement> map = new HashMap<DirectedGraphElement,DirectedGraphElement>();
+		PetrinetGraph netCopy = PetrinetFactory.clonePetrinet((Petrinet) net, map);
+		
+		// INSERT LABELS
+		for (Map.Entry<String,Set<org.jbpt.petri.Place>> entry : labels2places.entrySet()) {
+			for (org.jbpt.petri.Place p : entry.getValue()) {
+				Transition tt = netCopy.addTransition(entry.getKey());
+				Place pp = (Place) map.get(mapY.get(p));
+				netCopy.addArc(pp, tt);
+				netCopy.addArc(tt, pp);
+			}
+		}
+		
+		// SKIP LABELS
+		for (Object o : toSkip) {
+			Transition t = (Transition) o;
+			
+			Transition tt = netCopy.addTransition("");
+			tt.setInvisible(true);
+			
+			for (PetrinetEdge<?,?> edge : netCopy.getInEdges((Transition)map.get(t))) {
+				netCopy.addArc((Place)edge.getSource(), tt);
+			}
+			
+			for (PetrinetEdge<?,?> edge : netCopy.getOutEdges((Transition)map.get(t))) {
+				netCopy.addArc(tt,(Place)edge.getTarget());
+			}
+		}
+		
+		return netCopy;
+	}
+	
+	public PetrinetGraph repairOLD(RepairRecommendation rec) {		
+		Map<Transition,Integer>  tempMOS = new HashMap<Transition,Integer>(this.costFuncMOS);
+		Map<XEventClass,Integer> tempMOT = new HashMap<XEventClass,Integer>(this.costFuncMOT);
+		this.adjustCostFuncMOS(tempMOS,rec.getSkipLabels());
+		this.adjustCostFuncMOT(tempMOT,rec.getInsertLabels());
+		
+		PetrinetReplayerWithoutILP replayEngine = new PetrinetReplayerWithoutILP();		
+		
+		IPNReplayParameter parameters = new CostBasedCompleteParam(tempMOT,tempMOS);
+		parameters.setInitialMarking(this.initMarking);
+		parameters.setFinalMarkings(this.finalMarkings[0]);
+		parameters.setGUIMode(false);
+		parameters.setCreateConn(false);
+
+		PNRepResult result = null;
+		try {
+			result = replayEngine.replayLog(this.context, this.net, this.log, this.mapping, parameters);
+		} catch (AStarException e1) {
+			e1.printStackTrace();
+		}
+	
+		// COLLECT TRANSITIONS TO SKIP
+		Set<Object> toSkip = new HashSet<Object>();
+		if (!rec.getSkipLabels().isEmpty()) { 
+			for (SyncReplayResult res : result) {
+				for (int i=0; i<res.getStepTypes().size(); i++) {
+					if (res.getStepTypes().get(i)==StepTypes.MREAL) {
+						Object obj = res.getNodeInstance().get(i);
+						if (rec.getSkipLabels().contains(obj.toString()))
+							toSkip.add(obj);
+					}
+				}
+			}	
+		}
+		
+		// REPAIR MOVES ON TRACE (insert labels)
+		Map<String,Set<Set<org.jbpt.petri.Place>>> labels2markings = new HashMap<String,Set<Set<org.jbpt.petri.Place>>>();
+		Map<PetrinetNode,org.jbpt.petri.Node> mapX = new HashMap<PetrinetNode,org.jbpt.petri.Node>();
+		Map<org.jbpt.petri.Node,PetrinetNode> mapY = new HashMap<org.jbpt.petri.Node,PetrinetNode>();
+		
+		NetSystem sys = this.constructNetSystem(this.net, mapX, mapY);
+		
+		for (SyncReplayResult res : result) {
+			this.loadInitialMarking(sys, mapX);
+			
+			for (int i=0; i<res.getStepTypes().size(); i++) {
+				StepTypes type = res.getStepTypes().get(i);
+				
+				if (type==StepTypes.L) {
+					XEventClass e = (XEventClass) res.getNodeInstance().get(i);
+					if (rec.getInsertLabels().contains(e.getId())) {
+						Set<org.jbpt.petri.Place> ps = new HashSet<org.jbpt.petri.Place>(sys.getMarkedPlaces());
+						
+						if (labels2markings.containsKey(e.getId()))
+							labels2markings.get(e.getId()).add(ps);
+						else {
+							Set<Set<org.jbpt.petri.Place>> markings = new HashSet<Set<org.jbpt.petri.Place>>();
+							markings.add(ps);
+							labels2markings.put(e.getId(), markings);
+						}
+					}
+				}
+				else {
+					Transition t = (Transition) res.getNodeInstance().get(i);
+					org.jbpt.petri.Transition tt = (org.jbpt.petri.Transition) mapX.get(t);
+					sys.fire(tt);
+				}				
+			}
+		}
+		
+		Map<String,Set<org.jbpt.petri.Place>> labels2places = new HashMap<String,Set<org.jbpt.petri.Place>>();
+		
+		for (Map.Entry<String,Set<Set<org.jbpt.petri.Place>>> entry : labels2markings.entrySet()) {
 			Set<Set<org.jbpt.petri.Place>> ms = new HashSet<Set<org.jbpt.petri.Place>>(entry.getValue());
 			Set<org.jbpt.petri.Place> places = new HashSet<org.jbpt.petri.Place>();
 			for (Set<org.jbpt.petri.Place> m : entry.getValue()) places.addAll(m);
@@ -361,7 +494,7 @@ public abstract class RepairRecommendationSearch {
 		return netCopy;
 	}
 	
-	public PetrinetGraph repairOLD(RepairRecommendation rec) {		
+	public PetrinetGraph repairOLDOLD(RepairRecommendation rec) {		
 		Map<Transition,Integer>  tempMOS = new HashMap<Transition,Integer>(this.costFuncMOS);
 		Map<XEventClass,Integer> tempMOT = new HashMap<XEventClass,Integer>(this.costFuncMOT);
 		this.adjustCostFuncMOS(tempMOS,rec.getSkipLabels());
