@@ -391,7 +391,7 @@ public class RepairRecommendationSearchExpCSV {
 							costMOT = constructMOTCostFunction(net,log,eventClassifier,dummyEvClass);
 							mapping = constructMapping(net,log,dummyEvClass, eventClassifier);
 							
-							boolean considerAll = true;
+							boolean singleton = false;
 							switch (alg) {
 								case BF : 
 									rrSearch = new BruteForceRepairRecommendationSearch(net, initialMarking, finalMarkings, log, costMOS, costMOT, mapping, eventClassifier, debug);
@@ -400,17 +400,17 @@ public class RepairRecommendationSearchExpCSV {
 									rrSearch = new BruteForceRepairRecommendationSearchWithOptimization(net, initialMarking, finalMarkings, log, costMOS, costMOT, mapping, eventClassifier, debug);
 									break;
 								case GREEDY_ONE:
-									considerAll = false;
+									singleton = true;
 								case GREEDY_ALL:
 									rrSearch = new GreedyRepairRecommendationSearch(net, initialMarking, finalMarkings, log, costMOS, costMOT, mapping, eventClassifier, debug);
 									break;
 								case GOLDRATT_ONE:
-									considerAll = false;
+									singleton = true;
 								case GOLDRATT_ALL:
 									rrSearch = new GoldrattRepairRecommendationSearch(net, initialMarking, finalMarkings, log, costMOS, costMOT, mapping, eventClassifier, debug);
 									break;
 								case KNAPSACK_ONE:
-									considerAll = false;
+									singleton = true;
 									rrSearch = new KnapsackRepairRecommendationSearch(net, initialMarking, finalMarkings, log, costMOS, costMOT, mapping, eventClassifier, debug);
 									break;
 								default:
@@ -427,7 +427,7 @@ public class RepairRecommendationSearchExpCSV {
 							System.out.print(res+",");
 							
 							long start = System.nanoTime();
-							Set<RepairRecommendation> recs = rrSearch.computeOptimalRepairRecommendations(constraint,considerAll);
+							Set<RepairRecommendation> recs = rrSearch.computeOptimalRepairRecommendations(constraint,singleton);
 							long end = System.nanoTime();
 							
 							System.out.print((end-start)+",");
