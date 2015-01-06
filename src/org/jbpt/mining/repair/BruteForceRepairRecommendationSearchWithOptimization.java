@@ -1,5 +1,4 @@
 package org.jbpt.mining.repair;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -36,7 +35,7 @@ public class BruteForceRepairRecommendationSearchWithOptimization extends Repair
 	private void computeOptimalRepairRecommendations(RepairConstraint constraint, RepairRecommendation recommendation, 
 							RepairRecommendation previousRecommendation, Set<String> labelsI, Set<String> labelsS, boolean first) {
 		
-		if (this.optimalCost<=0) return;
+		if (this.optimalAlignmentCost<=0) return;
 		if (visited.contains(recommendation)) return;
 		
 		// recommendation is over my budget!
@@ -45,23 +44,21 @@ public class BruteForceRepairRecommendationSearchWithOptimization extends Repair
 				return;
 			
 			// prepare cost functions
-			Map<Transition,Integer>  tempMOS	= new HashMap<Transition,Integer>(this.costFuncMOS);
-			Map<XEventClass,Integer> tempMOT	= new HashMap<XEventClass,Integer>(this.costFuncMOT);
-			this.adjustCostFuncMOS(tempMOS,previousRecommendation.getSkipLabels());
-			this.adjustCostFuncMOT(tempMOT,previousRecommendation.getInsertLabels());
+			Map<Transition,Integer>  tempMOS = this.getAdjustedCostFuncMOS(recommendation.getSkipLabels());
+			Map<XEventClass,Integer> tempMOT = this.getAdjustedCostFuncMOT(recommendation.getInsertLabels());
 			
 			// compute cost
-			int cost = this.computeCost(tempMOS, tempMOT);
+			int cost = this.computeAlignmentCost(tempMOS,tempMOT);
 			
 			if (this.debug) System.out.println(String.format("DEBUG> %s : %s", recommendation, cost));
 			
 			// update optimal cost
-			if (cost < this.optimalCost) {
-				this.optimalCost = cost;
+			if (cost < this.optimalAlignmentCost) {
+				this.optimalAlignmentCost = cost;
 				this.optimalRepairRecommendations.clear();
 				this.optimalRepairRecommendations.add(previousRecommendation);
 			}
-			else if (cost == this.optimalCost) {
+			else if (cost == this.optimalAlignmentCost) {
 				this.optimalRepairRecommendations.add(previousRecommendation);
 			}
 			
@@ -93,19 +90,14 @@ public class BruteForceRepairRecommendationSearchWithOptimization extends Repair
 			this.computeOptimalRepairRecommendations(constraint,rec,recommendation,labelsIC,labelsSC,false);
 		}
 	}
-
-	@Override
-	public Set<RepairRecommendation> computeOptimalRepairRecommendations(RepairConstraint constraint) {
-		return this.computeOptimalRepairRecommendations(constraint,true);
-	}
 	
 	@Override
 	public Set<RepairRecommendation> computeOptimalRepairRecommendations(RepairConstraint constraint, boolean considerAll) {
-		this.alignmentCostComputations	= 0;
+		this.alignmentComputations	= 0;
 		this.optimalRepairRecommendations.clear();
 		this.visited.clear();
 		this.computed.clear();
-		this.optimalCost = Integer.MAX_VALUE;
+		this.optimalAlignmentCost = Integer.MAX_VALUE;
 		
 		RepairRecommendation recommendation	= new RepairRecommendation();
 		
@@ -114,7 +106,7 @@ public class BruteForceRepairRecommendationSearchWithOptimization extends Repair
 		
 		this.computeOptimalRepairRecommendations(constraint, recommendation, recommendation, labelsI, labelsS, true);
 		
-		this.backtrackOptimalRepairRecommendations();
+		this.minimizeOptimalRepairRecommendations();
 		
 		return this.optimalRepairRecommendations;
 	}

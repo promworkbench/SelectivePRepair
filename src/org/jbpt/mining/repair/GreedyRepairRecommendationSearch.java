@@ -1,5 +1,4 @@
 package org.jbpt.mining.repair;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -15,8 +14,6 @@ import org.processmining.plugins.connectionfactories.logpetrinet.TransEvClassMap
 
 /**
  * @author Artem Polyvyanyy
- * 
- * TODO: think of a termination condition once all expansions of current repair recommendation do not lead to alignment improvement
  */
 public class GreedyRepairRecommendationSearch extends RepairRecommendationSearch {
 	
@@ -32,17 +29,10 @@ public class GreedyRepairRecommendationSearch extends RepairRecommendationSearch
 		super(net, initMarking, finalMarkings, log, costMOS, costMOT, mapping, eventClassifier, debug);
 	}
 
-	@Override
-	public Set<RepairRecommendation> computeOptimalRepairRecommendations(RepairConstraint constraint) {
-		return this.computeOptimalRepairRecommendations(constraint,true);
-	}
-
-	public Set<RepairRecommendation> computeOptimalRepairRecommendations(RepairConstraint constraint, boolean considerAll) {
-		this.alignmentCostComputations	= 0;
+	public Set<RepairRecommendation> computeOptimalRepairRecommendations(RepairConstraint constraint, boolean singleton) {
 		this.optimalRepairRecommendations.clear();
-				
-		// cost of alignment to start with
-		this.optimalCost = this.computeCost(this.costFuncMOS, this.costFuncMOT);
+		this.optimalAlignmentCost = this.computeAlignmentCost(this.costFuncMOS, this.costFuncMOT);
+		int cCost = this.optimalAlignmentCost;
 		
 		Set<String> labelsI = CostFunction.getLabels(this.log,this.eventClassifier);
 		Set<String> labelsS = CostFunction.getLabels(this.net);
@@ -53,69 +43,93 @@ public class GreedyRepairRecommendationSearch extends RepairRecommendationSearch
 		recs.add(recommendation);
 		
 		do {
-			if (debug) System.out.println("DEBUG> Alignment computations: "+this.alignmentCostComputations);
+			//if (debug) System.out.println("DEBUG> Alignment computations: "+this.alignmentComputations);
 			
 			this.optimalRepairRecommendations.clear();
+			this.optimalRepairRecommendations.addAll(recs);
 			
-			//if (considerAll)
-				this.optimalRepairRecommendations.addAll(recs);
-			//else
-				//this.optimalRepairRecommendations.add(recs.iterator().next());
-				
-			if (this.optimalCost<=0) break; //!!!!
+			if (this.optimalAlignmentCost<=0)
+				return this.optimalRepairRecommendations;
+			
 			recs.clear();
+			int mci = 0;
+			int mrc = 0;
+			boolean free = false;
 			
+			Set<RepairRecommendation> visited = new HashSet<RepairRecommendation>();
+				
 			for (RepairRecommendation r : this.optimalRepairRecommendations) {
-				// handle insert labels
+				Set<AlignmentLabel> labels = new HashSet<AlignmentLabel>();
+				
 				Set<String> ls = new HashSet<String>(labelsI);
 				ls.removeAll(r.insertLabels);
-				
-				for (String label : ls) {
-					RepairRecommendation rec = r.clone();
-					rec.insertLabels.add(label);
-					if (!CostFunction.isUnderBudget(constraint, rec)) continue;
-					
-					// compute alignment cost
-					Map<Transition,Integer>  tempMOS	= new HashMap<Transition,Integer>(this.costFuncMOS);
-					Map<XEventClass,Integer> tempMOT	= new HashMap<XEventClass,Integer>(this.costFuncMOT);
-					this.adjustCostFuncMOS(tempMOS,rec.getSkipLabels());
-					this.adjustCostFuncMOT(tempMOT,rec.getInsertLabels());
-					int cost = this.computeCost(tempMOS, tempMOT);
-					
-					if (cost<=this.optimalCost) {
-						if (cost<this.optimalCost || !considerAll) recs.clear();
-						recs.add(rec);
-						this.optimalCost = cost;
-					}
-				}
-				
-				// handle skip labels
+				for (String label : ls) labels.add(new AlignmentLabel(label, true));
 				ls = new HashSet<String>(labelsS);
 				ls.removeAll(r.skipLabels);
+				for (String label : ls) labels.add(new AlignmentLabel(label, false));
 				
-				for (String label : ls) {
+				for (AlignmentLabel lb : labels) {
 					RepairRecommendation rec = r.clone();
-					rec.skipLabels.add(label);
+					
+					if (lb.isTransition()) rec.insertLabels.add(lb.getLabel());
+					else rec.skipLabels.add(lb.getLabel());
+					
+					if (visited.contains(rec)) continue; else visited.add(rec);
 					if (!CostFunction.isUnderBudget(constraint, rec)) continue;
 					
-					// compute alignment cost
-					Map<Transition,Integer>  tempMOS	= new HashMap<Transition,Integer>(this.costFuncMOS);
-					Map<XEventClass,Integer> tempMOT	= new HashMap<XEventClass,Integer>(this.costFuncMOT);
-					this.adjustCostFuncMOS(tempMOS,rec.getSkipLabels());
-					this.adjustCostFuncMOT(tempMOT,rec.getInsertLabels());
-					int cost = this.computeCost(tempMOS, tempMOT);
+					int aCost = this.optimalAlignmentCost;
 					
-					if (cost<=this.optimalCost) {
-						if (cost<this.optimalCost || !considerAll) recs.clear();
+					int crc = 0;
+					if (lb.isTransition()) crc = constraint.getInsertCosts().get(lb.getLabel());
+					else crc = constraint.getSkipCosts().get(lb.getLabel()); 
+					
+					if (crc==0 || (!free && (((double) this.optimalAlignmentCost / crc) >= mci))) {
+						Map<Transition,Integer>  tempMOS = this.getAdjustedCostFuncMOS(rec.getSkipLabels());
+						Map<XEventClass,Integer> tempMOT = this.getAdjustedCostFuncMOT(rec.getInsertLabels());
+						aCost = this.computeAlignmentCost(tempMOS,tempMOT);
+					}
+					
+					int cci = this.optimalAlignmentCost - aCost;
+					if (crc>0) cci = cci/crc;
+					
+					if (crc>0 && cci>mci && !free) {
+						mci = cci;
+						mrc = crc;
+						recs.clear();
 						recs.add(rec);
-						this.optimalCost = cost;
+						cCost = aCost;
+					}
+					else if (crc>mrc && cci>0 && cci==mci && !free) {
+						mrc = crc;
+						recs.clear();
+						recs.add(rec);
+						cCost = aCost;
+					}
+					else if (crc>0 && crc==mrc && cci>0 && cci==mci && !free && !singleton) {
+						recs.add(rec);
+					}
+					else if (crc==0 && cci>mci && free) {
+						mci = cci; 
+						recs.clear();
+						recs.add(rec);
+						cCost = aCost;
+					}
+					else if (crc==0 && cci==mci && free && !singleton) {
+						recs.add(rec);
+					}
+					else if (crc==0 && cci>0 && !free) {
+						free = true;
+						mci = cci;
+						recs.clear();
+						recs.add(rec);
+						cCost = aCost;
 					}
 				}
 			}
 			
+			this.optimalAlignmentCost = cCost;
+			
 		} while (!recs.isEmpty());
-		
-		//this.backtrackOptimalRepairRecommendations();
 		
 		return this.optimalRepairRecommendations;
 	}

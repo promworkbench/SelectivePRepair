@@ -138,12 +138,12 @@ public class RepairRecommendationSearchExp {
 						System.out.println("Repair recommendations search time: "+(end-start));
 						System.out.println("Repair recommendations: "+recs);
 						System.out.println("Number of repair recommendations: "+recs.size());
-						System.out.println("Number of alignment computations: "+rrSearch.getNumberOfAlignmentCostComputations());
-						System.out.println("Optimal alignment cost achieved: "+rrSearch.getOptimalCost());
+						System.out.println("Number of alignment computations: "+rrSearch.getNumberOfAlignmentComputations());
+						System.out.println("Optimal alignment cost achieved: "+rrSearch.getOptimalAlignmentCost());
 						
 						int count = 0;
 						for (RepairRecommendation rec : recs) {
-							String repairedName = String.format("exp/%s.%s.%s.%s.%s.%s.REPAIRED.pnml",alg,netFile,logFile,res,count,rrSearch.getOptimalCost());
+							String repairedName = String.format("exp/%s.%s.%s.%s.%s.%s.REPAIRED.pnml",alg,netFile,logFile,res,count,rrSearch.getOptimalAlignmentCost());
 							
 							PetrinetGraph repaired = rrSearch.repair(rec);
 							rrSearch.serializeNet(repaired,repairedName);

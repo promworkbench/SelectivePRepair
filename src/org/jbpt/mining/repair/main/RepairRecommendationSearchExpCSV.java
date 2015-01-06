@@ -433,8 +433,8 @@ public class RepairRecommendationSearchExpCSV {
 							System.out.print((end-start)+",");
 							System.out.print(recs.toString().replace(",", ";")+",");
 							System.out.print(recs.size()+",");
-							System.out.print(rrSearch.getNumberOfAlignmentCostComputations()+",");
-							int optCost=rrSearch.getOptimalCost();
+							System.out.print(rrSearch.getNumberOfAlignmentComputations()+",");
+							int optCost=rrSearch.getOptimalAlignmentCost();
 							System.out.print(optCost+",");
 							
 							alg2lastCost.put(alg,optCost);
@@ -442,7 +442,7 @@ public class RepairRecommendationSearchExpCSV {
 							boolean good = true;
 							int count = 0;
 							for (RepairRecommendation rec : recs) {
-								String repairedName = String.format("./exp/REPAIRED.%s.%s.%s.%s.%s.%s.pnml",alg,netFile,logFile,res,count,rrSearch.getOptimalCost());
+								String repairedName = String.format("./exp/REPAIRED.%s.%s.%s.%s.%s.%s.pnml",alg,netFile,logFile,res,count,rrSearch.getOptimalAlignmentCost());
 								
 								PetrinetGraph repaired = rrSearch.repair(rec);
 								rrSearch.serializeNet(repaired,repairedName);
@@ -468,7 +468,7 @@ public class RepairRecommendationSearchExpCSV {
 								
 								rrrSearch.computeOptimalRepairRecommendations(rConstraint,false);
 								
-								int optCost2 = rrrSearch.getOptimalCost();
+								int optCost2 = rrrSearch.getOptimalAlignmentCost();
 								
 								boolean good2 = (optCost2==optCost); 
 								good &= good2;

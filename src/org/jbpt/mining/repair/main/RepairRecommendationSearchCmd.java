@@ -178,8 +178,8 @@ public class RepairRecommendationSearchCmd {
 		System.out.println(recs);
 		System.out.println(recs.size());
 		System.out.println("=====");
-		System.out.println(opt.getNumberOfAlignmentCostComputations());
-		System.out.println(opt.getOptimalCost());
+		System.out.println(opt.getNumberOfAlignmentComputations());
+		System.out.println(opt.getOptimalAlignmentCost());
 		
 		// REPAIR NET
 		PetrinetGraph repaired = opt.repair(recs.iterator().next());

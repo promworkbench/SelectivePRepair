@@ -19,7 +19,6 @@ import org.jbpt.petri.NetSystem;
 import org.jbpt.petri.Node;
 import org.jbpt.petri.io.PNMLSerializer;
 import org.jbpt.throwable.SerializationException;
-import org.processmining.contexts.uitopia.DummyGlobalContext;
 import org.processmining.contexts.uitopia.DummyUIPluginContext;
 import org.processmining.models.graphbased.directed.DirectedGraphElement;
 import org.processmining.models.graphbased.directed.petrinet.Petrinet;
@@ -59,8 +58,8 @@ public abstract class RepairRecommendationSearch {
 	protected Map<Transition,Integer> 	costFuncMOS		= null;
 	protected Map<XEventClass,Integer>	costFuncMOT		= null;
 	
-	protected int alignmentCostComputations = 0;
-	protected int optimalCost = Integer.MAX_VALUE;
+	protected int alignmentComputations = 0;
+	protected int optimalAlignmentCost = Integer.MAX_VALUE;
 	protected Set<RepairRecommendation> optimalRepairRecommendations = null;
 	
 	protected boolean debug = true;
@@ -78,16 +77,14 @@ public abstract class RepairRecommendationSearch {
 		
 		if (net==null) return;
 		
-		this.context 			= new DummyUIPluginContext(new DummyGlobalContext(), "label");
-		
-		this.eventClassifier	= eventClassifier;
-		
 		this.optimalRepairRecommendations = new HashSet<RepairRecommendation>();
 		
 		this.net				= net;
+		this.log				= log;
 		this.initMarking 		= initMarking;
 		this.finalMarkings		= finalMarkings;
-		this.log				= log;
+		this.eventClassifier	= eventClassifier;
+		//this.context 			= new DummyUIPluginContext(new DummyGlobalContext(), "label");
 		
 		this.costFuncMOS		= costMOS;
 		this.costFuncMOT		= costMOT;
@@ -102,22 +99,20 @@ public abstract class RepairRecommendationSearch {
 		}
 	}
 	
-	public int computeCost() {
-		return this.computeCost(this.costFuncMOS,this.costFuncMOT);
+	public Set<RepairRecommendation> computeOptimalRepairRecommendations(RepairConstraint constraint) {
+		return this.computeOptimalRepairRecommendations(constraint,true);
 	}
 	
-	public int getNumberOfAlignmentCostComputations() {
-		return this.alignmentCostComputations;
+	public abstract Set<RepairRecommendation> computeOptimalRepairRecommendations(RepairConstraint constraint, boolean singleton);
+	
+	public int getNumberOfAlignmentComputations() {
+		return this.alignmentComputations;
 	}
 	
-	public abstract Set<RepairRecommendation> computeOptimalRepairRecommendations(RepairConstraint constraint, boolean considerAll);
-	
-	public abstract Set<RepairRecommendation> computeOptimalRepairRecommendations(RepairConstraint constraint);
-	
-	public int getOptimalCost() {
-		return optimalCost;
+	public int getOptimalAlignmentCost() {
+		return this.optimalAlignmentCost;
 	}
-	
+
 	protected void preserveMinimalOptimalRepairRecommendations() {
 		Set<RepairRecommendation> toRemove = new HashSet<RepairRecommendation>();
 		
@@ -135,33 +130,28 @@ public abstract class RepairRecommendationSearch {
 		this.optimalRepairRecommendations.removeAll(toRemove);
 	}
 	
-	protected void backtrackOptimalRepairRecommendations() {
-		Set<RepairRecommendation> visited = new HashSet<RepairRecommendation>();
+	protected void minimizeOptimalRepairRecommendations() {
+		Set<RepairRecommendation>	visited = new HashSet<RepairRecommendation>();
 		Queue<RepairRecommendation> toVisit = new ConcurrentLinkedQueue<RepairRecommendation>(this.optimalRepairRecommendations); 
-		Set<RepairRecommendation> optimal = new HashSet<RepairRecommendation>();
+		Set<RepairRecommendation>	optimal = new HashSet<RepairRecommendation>();
 		
 		while (!toVisit.isEmpty()) {
 			RepairRecommendation r = toVisit.poll();
 			visited.add(r);
-			
-			boolean isOptimal = true;
+			boolean isMinimal = true;
 			
 			// skip labels
 			for (String label : r.skipLabels) {
 				RepairRecommendation rec = r.clone();
 				rec.skipLabels.remove(label);
 				
-				Map<Transition,Integer>  tempMOS	= new HashMap<Transition,Integer>(this.costFuncMOS);
-				Map<XEventClass,Integer> tempMOT	= new HashMap<XEventClass,Integer>(this.costFuncMOT);
-				this.adjustCostFuncMOS(tempMOS,rec.getSkipLabels());
-				this.adjustCostFuncMOT(tempMOT,rec.getInsertLabels());
+				Map<Transition,Integer>  tempMOS = this.getAdjustedCostFuncMOS(rec.getSkipLabels());
+				Map<XEventClass,Integer> tempMOT = this.getAdjustedCostFuncMOT(rec.getInsertLabels());
+				int cost = this.computeAlignmentCost(tempMOS, tempMOT);
 				
-				int cost = this.computeCost(tempMOS, tempMOT);
-				this.alignmentCostComputations++;
-				
-				if (cost==this.getOptimalCost()) {
-					if (!visited.contains(rec) && !toVisit.contains(rec)) toVisit.add(rec);
-					isOptimal = false;
+				if (cost==this.optimalAlignmentCost) {
+					if (!visited.contains(rec)) toVisit.add(rec); // && !toVisit.contains(rec)
+					isMinimal = false;
 				}
 			}
 			
@@ -170,22 +160,17 @@ public abstract class RepairRecommendationSearch {
 				RepairRecommendation rec = r.clone();
 				rec.insertLabels.remove(label);
 				
-				Map<Transition,Integer>  tempMOS	= new HashMap<Transition,Integer>(this.costFuncMOS);
-				Map<XEventClass,Integer> tempMOT	= new HashMap<XEventClass,Integer>(this.costFuncMOT);
-				this.adjustCostFuncMOS(tempMOS,rec.getSkipLabels());
-				this.adjustCostFuncMOT(tempMOT,rec.getInsertLabels());
+				Map<Transition,Integer>  tempMOS = this.getAdjustedCostFuncMOS(rec.getSkipLabels());
+				Map<XEventClass,Integer> tempMOT = this.getAdjustedCostFuncMOT(rec.getInsertLabels());
+				int cost = this.computeAlignmentCost(tempMOS, tempMOT);
 				
-				int cost = this.computeCost(tempMOS, tempMOT);
-				this.alignmentCostComputations++;
-				
-				if (cost==this.getOptimalCost()) {
-					if (!visited.contains(rec) && !toVisit.contains(rec)) toVisit.add(rec);
-					isOptimal = false;
+				if (cost==this.optimalAlignmentCost) {
+					if (!visited.contains(rec)) toVisit.add(rec); //  && !toVisit.contains(rec)
+					isMinimal = false;
 				}
 			}
 			
-			if (isOptimal)
-				optimal.add(r);
+			if (isMinimal) optimal.add(r);
 			
 		}
 		
@@ -193,39 +178,43 @@ public abstract class RepairRecommendationSearch {
 		this.optimalRepairRecommendations.addAll(optimal);
 	}
 	
-	protected void adjustCostFuncMOS(Map<Transition,Integer> costFunc, Set<String> labels) {
+	protected Map<Transition,Integer> getAdjustedCostFuncMOS(Set<String> labels) {
+		Map<Transition,Integer> result = new HashMap<Transition,Integer>(this.costFuncMOS);
+		
 		Set<Transition> ts = new HashSet<Transition>();
 		
-		for (Map.Entry<Transition,Integer> entry : costFunc.entrySet()) {
+		for (Map.Entry<Transition,Integer> entry : result.entrySet()) {
 			if (labels.contains(entry.getKey().getLabel())) {
 				ts.add(entry.getKey());
 			}
 		}
 		
-		for (Transition t : ts) {
-			costFunc.put(t,0);
-		}
+		for (Transition t : ts)	result.put(t,0);
+		
+		return result;
 	}
 	
-	protected void adjustCostFuncMOT(Map<XEventClass, Integer> costFunc, Set<String> labels) { 
+	protected Map<XEventClass,Integer> getAdjustedCostFuncMOT(Set<String> labels) {
+		Map<XEventClass,Integer> result	= new HashMap<XEventClass,Integer>(this.costFuncMOT);
+		
 		Set<XEventClass> es = new HashSet<XEventClass>();
 		
-		for (Map.Entry<XEventClass,Integer> entry : costFunc.entrySet()) {
+		for (Map.Entry<XEventClass,Integer> entry : result.entrySet()) {
 			if (labels.contains(entry.getKey().getId())) {
 				es.add(entry.getKey());
 			}
 		}
 		
 		for (XEventClass e : es) {
-			costFunc.put(e,0);
+			result.put(e,0);
 		}
+		
+		return result;
 	}
 	
 	public PetrinetGraph repair(RepairRecommendation rec) {		
-		Map<Transition,Integer>  tempMOS = new HashMap<Transition,Integer>(this.costFuncMOS);
-		Map<XEventClass,Integer> tempMOT = new HashMap<XEventClass,Integer>(this.costFuncMOT);
-		this.adjustCostFuncMOS(tempMOS,rec.getSkipLabels());
-		this.adjustCostFuncMOT(tempMOT,rec.getInsertLabels());
+		Map<Transition,Integer>  tempMOS = this.getAdjustedCostFuncMOS(rec.getSkipLabels());
+		Map<XEventClass,Integer> tempMOT = this.getAdjustedCostFuncMOT(rec.getInsertLabels());
 		
 		PetrinetReplayerWithoutILP replayEngine = new PetrinetReplayerWithoutILP();		
 		
@@ -352,315 +341,10 @@ public abstract class RepairRecommendationSearch {
 		return netCopy;
 	}
 	
-	public PetrinetGraph repairOLD(RepairRecommendation rec) {		
-		Map<Transition,Integer>  tempMOS = new HashMap<Transition,Integer>(this.costFuncMOS);
-		Map<XEventClass,Integer> tempMOT = new HashMap<XEventClass,Integer>(this.costFuncMOT);
-		this.adjustCostFuncMOS(tempMOS,rec.getSkipLabels());
-		this.adjustCostFuncMOT(tempMOT,rec.getInsertLabels());
-		
-		PetrinetReplayerWithoutILP replayEngine = new PetrinetReplayerWithoutILP();		
-		
-		IPNReplayParameter parameters = new CostBasedCompleteParam(tempMOT,tempMOS);
-		parameters.setInitialMarking(this.initMarking);
-		parameters.setFinalMarkings(this.finalMarkings[0]);
-		parameters.setGUIMode(false);
-		parameters.setCreateConn(false);
-
-		PNRepResult result = null;
-		try {
-			result = replayEngine.replayLog(this.context, this.net, this.log, this.mapping, parameters);
-		} catch (AStarException e1) {
-			e1.printStackTrace();
-		}
-	
-		// COLLECT TRANSITIONS TO SKIP
-		Set<Object> toSkip = new HashSet<Object>();
-		if (!rec.getSkipLabels().isEmpty()) { 
-			for (SyncReplayResult res : result) {
-				for (int i=0; i<res.getStepTypes().size(); i++) {
-					if (res.getStepTypes().get(i)==StepTypes.MREAL) {
-						Object obj = res.getNodeInstance().get(i);
-						if (rec.getSkipLabels().contains(obj.toString()))
-							toSkip.add(obj);
-					}
-				}
-			}	
-		}
-		
-		// REPAIR MOVES ON TRACE (insert labels)
-		Map<String,Set<Set<org.jbpt.petri.Place>>> labels2markings = new HashMap<String,Set<Set<org.jbpt.petri.Place>>>();
-		Map<PetrinetNode,org.jbpt.petri.Node> mapX = new HashMap<PetrinetNode,org.jbpt.petri.Node>();
-		Map<org.jbpt.petri.Node,PetrinetNode> mapY = new HashMap<org.jbpt.petri.Node,PetrinetNode>();
-		
-		NetSystem sys = this.constructNetSystem(this.net, mapX, mapY);
-		
-		for (SyncReplayResult res : result) {
-			this.loadInitialMarking(sys, mapX);
-			
-			for (int i=0; i<res.getStepTypes().size(); i++) {
-				StepTypes type = res.getStepTypes().get(i);
-				
-				if (type==StepTypes.L) {
-					XEventClass e = (XEventClass) res.getNodeInstance().get(i);
-					if (rec.getInsertLabels().contains(e.getId())) {
-						Set<org.jbpt.petri.Place> ps = new HashSet<org.jbpt.petri.Place>(sys.getMarkedPlaces());
-						
-						if (labels2markings.containsKey(e.getId()))
-							labels2markings.get(e.getId()).add(ps);
-						else {
-							Set<Set<org.jbpt.petri.Place>> markings = new HashSet<Set<org.jbpt.petri.Place>>();
-							markings.add(ps);
-							labels2markings.put(e.getId(), markings);
-						}
-					}
-				}
-				else {
-					Transition t = (Transition) res.getNodeInstance().get(i);
-					org.jbpt.petri.Transition tt = (org.jbpt.petri.Transition) mapX.get(t);
-					sys.fire(tt);
-				}				
-			}
-		}
-		
-		Map<String,Set<org.jbpt.petri.Place>> labels2places = new HashMap<String,Set<org.jbpt.petri.Place>>();
-		
-		for (Map.Entry<String,Set<Set<org.jbpt.petri.Place>>> entry : labels2markings.entrySet()) {
-			Set<Set<org.jbpt.petri.Place>> ms = new HashSet<Set<org.jbpt.petri.Place>>(entry.getValue());
-			Set<org.jbpt.petri.Place> places = new HashSet<org.jbpt.petri.Place>();
-			for (Set<org.jbpt.petri.Place> m : entry.getValue()) places.addAll(m);
-			
-			Set<org.jbpt.petri.Place> ps	 = new HashSet<org.jbpt.petri.Place>();
-			
-			// TODO
-			while (!ms.isEmpty()) {
-				int max = Integer.MIN_VALUE;
-				
-				org.jbpt.petri.Place c = null;
-				for (org.jbpt.petri.Place cc : places) {
-					int count = 0;
-					for (Set<org.jbpt.petri.Place> m : ms) {
-						if (m.contains(cc)) count++;
-					}
-					
-					if (count>max) {
-						max = count;
-						c=cc;
-					}
-				}
-				
-				ps.add(c);
-				places.remove(c);
-				Set<Set<org.jbpt.petri.Place>> toRemove = new HashSet<Set<org.jbpt.petri.Place>>();
-				for (Set<org.jbpt.petri.Place> m : ms) {
-					if (m.contains(c))
-						toRemove.add(m);
-				}
-				
-				ms.removeAll(toRemove);
-			}
-			
-			labels2places.put(entry.getKey(),ps);
-		}
-		
-		Map<DirectedGraphElement,DirectedGraphElement> map = new HashMap<DirectedGraphElement,DirectedGraphElement>();
-		PetrinetGraph netCopy = PetrinetFactory.clonePetrinet((Petrinet) net, map);
-		
-		// INSERT LABELS
-		for (Map.Entry<String,Set<org.jbpt.petri.Place>> entry : labels2places.entrySet()) {
-			for (org.jbpt.petri.Place p : entry.getValue()) {
-				Transition tt = netCopy.addTransition(entry.getKey());
-				Place pp = (Place) map.get(mapY.get(p));
-				netCopy.addArc(pp, tt);
-				netCopy.addArc(tt, pp);
-			}
-		}
-		
-		// SKIP LABELS
-		for (Object o : toSkip) {
-			Transition t = (Transition) o;
-			
-			Transition tt = netCopy.addTransition("");
-			tt.setInvisible(true);
-			
-			for (PetrinetEdge<?,?> edge : netCopy.getInEdges((Transition)map.get(t))) {
-				netCopy.addArc((Place)edge.getSource(), tt);
-			}
-			
-			for (PetrinetEdge<?,?> edge : netCopy.getOutEdges((Transition)map.get(t))) {
-				netCopy.addArc(tt,(Place)edge.getTarget());
-			}
-		}
-		
-		return netCopy;
-	}
-	
-	public PetrinetGraph repairOLDOLD(RepairRecommendation rec) {		
-		Map<Transition,Integer>  tempMOS = new HashMap<Transition,Integer>(this.costFuncMOS);
-		Map<XEventClass,Integer> tempMOT = new HashMap<XEventClass,Integer>(this.costFuncMOT);
-		this.adjustCostFuncMOS(tempMOS,rec.getSkipLabels());
-		this.adjustCostFuncMOT(tempMOT,rec.getInsertLabels());
-		
-		PetrinetReplayerWithoutILP replayEngine = new PetrinetReplayerWithoutILP();		
-		
-		IPNReplayParameter parameters = new CostBasedCompleteParam(tempMOT,tempMOS);
-		parameters.setInitialMarking(this.initMarking);
-		parameters.setFinalMarkings(this.finalMarkings[0]);
-		parameters.setGUIMode(false);
-		parameters.setCreateConn(false);
-
-		PNRepResult result = null;
-		try {
-			result = replayEngine.replayLog(this.context, this.net, this.log, this.mapping, parameters);
-		} catch (AStarException e1) {
-			e1.printStackTrace();
-		}
-	
-		// COLLECT TRANSITIONS TO SKIP
-		Set<Object> toSkip = new HashSet<Object>();
-		if (!rec.getSkipLabels().isEmpty()) { 
-			for (SyncReplayResult res : result) {
-				for (int i=0; i<res.getStepTypes().size(); i++) {
-					if (res.getStepTypes().get(i)==StepTypes.MREAL) {
-						Object obj = res.getNodeInstance().get(i);
-						if (rec.getSkipLabels().contains(obj.toString()))
-							toSkip.add(obj);
-					}
-				}
-			}	
-		}
-		
-		// REPAIR MOVES ON TRACE (insert labels)
-		Map<String,Set<Set<org.jbpt.petri.Place>>> labels2markings = new HashMap<String,Set<Set<org.jbpt.petri.Place>>>();
-		Map<PetrinetNode,org.jbpt.petri.Node> mapX = new HashMap<PetrinetNode,org.jbpt.petri.Node>();
-		Map<org.jbpt.petri.Node,PetrinetNode> mapY = new HashMap<org.jbpt.petri.Node,PetrinetNode>();
-		
-		NetSystem sys = this.constructNetSystem(this.net, mapX, mapY);
-		
-		org.jbpt.petri.Place start = sys.getSourcePlaces().iterator().next();
-		org.jbpt.petri.Place end   = sys.getSinkPlaces().iterator().next();
-		
-		for (SyncReplayResult res : result) {
-			this.loadInitialMarking(sys, mapX);
-			
-			for (int i=0; i<res.getStepTypes().size(); i++) {
-				StepTypes type = res.getStepTypes().get(i);
-				
-				if (type==StepTypes.L) {
-					XEventClass e = (XEventClass) res.getNodeInstance().get(i);
-					if (rec.getInsertLabels().contains(e.getId())) {
-						Set<org.jbpt.petri.Place> ps = new HashSet<org.jbpt.petri.Place>(sys.getMarkedPlaces());
-						
-						if (labels2markings.containsKey(e.getId()))
-							labels2markings.get(e.getId()).add(ps);
-						else {
-							Set<Set<org.jbpt.petri.Place>> markings = new HashSet<Set<org.jbpt.petri.Place>>();
-							markings.add(ps);
-							labels2markings.put(e.getId(), markings);
-						}
-					}
-				}
-				else {
-					Transition t = (Transition) res.getNodeInstance().get(i);
-					org.jbpt.petri.Transition tt = (org.jbpt.petri.Transition) mapX.get(t);
-					sys.fire(tt);
-				}				
-			}
-		}
-		
-		Map<String,Set<org.jbpt.petri.Place>> labels2places = new HashMap<String,Set<org.jbpt.petri.Place>>();
-		
-		for (Map.Entry<String,Set<Set<org.jbpt.petri.Place>>> entry : labels2markings.entrySet()) {
-			Set<Set<org.jbpt.petri.Place>> ms = new HashSet<Set<org.jbpt.petri.Place>>(entry.getValue());
-			Set<org.jbpt.petri.Place> places = new HashSet<org.jbpt.petri.Place>();
-			for (Set<org.jbpt.petri.Place> m : entry.getValue()) places.addAll(m);
-			
-			Set<org.jbpt.petri.Place> ps	 = new HashSet<org.jbpt.petri.Place>();
-			
-			while (!ms.isEmpty()) {
-				int max = Integer.MIN_VALUE;
-				
-				org.jbpt.petri.Place c = null;
-				for (org.jbpt.petri.Place cc : places) {
-					int count = 0;
-					for (Set<org.jbpt.petri.Place> m : ms) {
-						if (m.contains(cc)) count++;
-					}
-					
-					if (count>max) {
-						max = count;
-						c=cc;
-					}
-				}
-				
-				ps.add(c);
-				places.remove(c);
-				Set<Set<org.jbpt.petri.Place>> toRemove = new HashSet<Set<org.jbpt.petri.Place>>();
-				for (Set<org.jbpt.petri.Place> m : ms) {
-					if (m.contains(c))
-						toRemove.add(m);
-				}
-				
-				ms.removeAll(toRemove);
-			}
-			
-			labels2places.put(entry.getKey(),ps);
-		}
-		
-		// PERFORM REPAIRS
-		boolean newStart = true;
-		boolean newEnd = true;
-		
-		Map<DirectedGraphElement,DirectedGraphElement> map = new HashMap<DirectedGraphElement,DirectedGraphElement>();
-		PetrinetGraph netCopy = PetrinetFactory.clonePetrinet((Petrinet) net, map);
-		
-		// INSERT LABELS
-		for (Map.Entry<String,Set<org.jbpt.petri.Place>> entry : labels2places.entrySet()) {
-			for (org.jbpt.petri.Place p : entry.getValue()) {
-				Transition tt = netCopy.addTransition(entry.getKey());
-				Place pp = (Place) map.get(mapY.get(p));
-				netCopy.addArc(pp, tt);
-				netCopy.addArc(tt, pp);
-				
-				if (p.equals(start) && newStart) {
-					Transition ttt = netCopy.addTransition("");
-					Place ppp = netCopy.addPlace("");
-					netCopy.addArc(ppp, ttt);
-					netCopy.addArc(ttt, pp);
-					newStart = false;
-				}
-				
-				if (p.equals(end) && newEnd) {
-					Transition ttt = netCopy.addTransition("");
-					Place ppp = netCopy.addPlace("");
-					netCopy.addArc(pp, ttt);
-					netCopy.addArc(ttt, ppp);
-					newEnd = false;
-				}	
-			}
-		}
-		
-		// SKIP LABELS
-		for (Object o : toSkip) {
-			Transition t = (Transition) o;
-			
-			Transition tt = netCopy.addTransition("");
-			tt.setInvisible(true);
-			
-			for (PetrinetEdge<?,?> edge : netCopy.getInEdges((Transition)map.get(t))) {
-				netCopy.addArc((Place)edge.getSource(), tt);
-			}
-			
-			for (PetrinetEdge<?,?> edge : netCopy.getOutEdges((Transition)map.get(t))) {
-				netCopy.addArc(tt,(Place)edge.getTarget());
-			}
-		}
-		
-		return netCopy;
-	}
-	
 	private void loadInitialMarking(NetSystem sys, Map<PetrinetNode, Node> map) {
 		sys.getMarking().clear();
 		Set<Place> places = new HashSet<Place>(this.initMarking);
+		
 		for (Place p : places)
 			sys.putTokens((org.jbpt.petri.Place) map.get(p), Collections.frequency(this.initMarking, p));
 	}
@@ -708,172 +392,235 @@ public abstract class RepairRecommendationSearch {
 		org.jbpt.utils.IOUtils.toFile(name, PNMLSerializer.serializePetriNet(n));
 	}
 	
-	/*public int computeCost(Map<Transition,Integer> costMOS, Map<XEventClass,Integer> costMOT) {
-		IPNReplayParameter parameters = new CostBasedCompleteManifestParam(costMOT, costMOS, 
-										this.initMarking, this.finalMarkings, this.maxNumOfStates, this.restrictedTrans);
-		parameters.setGUIMode(false);
-		
-		CostBasedCompletePruneAlg replayEngine = new CostBasedCompletePruneAlg();
-		PNRepResult result = replayEngine.replayLog(this.context, this.net, this.log, this.mapping, parameters);
-		
+	public int computeAlignmentCost(Map<Transition,Integer> transitions2costs, Map<XEventClass,Integer> events2costs) {
 		int cost = 0;
+		PNRepResult result = this.getPNReplayResults(transitions2costs, events2costs);
+			
 		for (SyncReplayResult res : result) {
-			cost += res.getInfo().get("Raw Fitness Cost");
+			cost += ((int) res.getInfo().get("Raw Fitness Cost").doubleValue()) * res.getTraceIndex().size();
 		}
-		
-		this.alignmentCostComputations++;
-		
-		return cost;
-	}*/
-	
-	public int computeCost(Map<Transition,Integer> costMOS, Map<XEventClass,Integer> costMOT) {
-		PetrinetReplayerWithoutILP replayEngine = new PetrinetReplayerWithoutILP();		
-		//AllOptAlignmentsGraphAlg replayEngine = new AllOptAlignmentsGraphAlg();
-		//AllOptAlignmentsGraphILPAlg replayEngine = new AllOptAlignmentsGraphILPAlg();
-		//AllOptAlignmentsTreeAlg replayEngine = new AllOptAlignmentsTreeAlg();
-		//CostBasedCompletePruneAlg replayEngine = new CostBasedCompletePruneAlg();
-		
-		IPNReplayParameter parameters = new CostBasedCompleteParam(costMOT,costMOS);
-		parameters.setInitialMarking(this.initMarking);
-		parameters.setFinalMarkings(this.finalMarkings[0]);
-		parameters.setGUIMode(false);
-		parameters.setCreateConn(false);
-		
-		/*Object[] parameters = new Object[3];
-		parameters[0] = costMOS;
-		parameters[2] = costMOT;
-		parameters[1] = Integer.MAX_VALUE;*/
-				
-		int cost = 0;
-		try {
-			PNRepResult result = replayEngine.replayLog(context, net, log, mapping, parameters);
-			
-			for (SyncReplayResult res : result) {
-				cost += ((int) res.getInfo().get("Raw Fitness Cost").doubleValue()) * res.getTraceIndex().size();
-			}
-		} catch (AStarException e) {
-			e.printStackTrace();
-		}
-		
-		this.alignmentCostComputations++;
 		
 		return cost;
 	}
 	
-	public Map<AlignmentStep,Integer> computeFrequencies(Map<Transition,Integer> t2c, Map<XEventClass,Integer> e2c) {
-		PetrinetReplayerWithoutILP replayEngine = new PetrinetReplayerWithoutILP();		
-		//AllOptAlignmentsGraphAlg replayEngine = new AllOptAlignmentsGraphAlg();
-		//AllOptAlignmentsGraphILPAlg replayEngine = new AllOptAlignmentsGraphILPAlg();
-		//AllOptAlignmentsTreeAlg replayEngine = new AllOptAlignmentsTreeAlg();
-		//CostBasedCompletePruneAlg replayEngine = new CostBasedCompletePruneAlg();
+	public int computeAlignmentCost() {
+		return this.computeAlignmentCost(this.costFuncMOS,this.costFuncMOT);
+	}
+	
+	public int computeAlignmentCost(RepairRecommendation rec) {
+		Map<Transition,Integer>  tempMOS	= this.getAdjustedCostFuncMOS(rec.getSkipLabels());
+		Map<XEventClass,Integer> tempMOT	= this.getAdjustedCostFuncMOT(rec.getInsertLabels());
 		
-		IPNReplayParameter parameters = new CostBasedCompleteParam(e2c,t2c);
-		parameters.setInitialMarking(this.initMarking);
-		parameters.setFinalMarkings(this.finalMarkings[0]);
-		parameters.setGUIMode(false);
-		parameters.setCreateConn(false);
-		
-		/*Object[] parameters = new Object[3];
-		parameters[0] = costMOS;
-		parameters[2] = costMOT;
-		parameters[1] = Integer.MAX_VALUE;*/
-				
+		return this.computeAlignmentCost(tempMOS,tempMOT);
+	}
+	
+	public Map<AlignmentStep,Integer> computeMovementFrequencies(Map<Transition,Integer> transitions2costs, Map<XEventClass,Integer> events2costs) {
 		Map<AlignmentStep,Integer> map = new HashMap<AlignmentStep, Integer>();
-		try {
-			PNRepResult result = replayEngine.replayLog(context, net, log, mapping, parameters);
-			
-			for (SyncReplayResult res : result) {
-				List<Object> nodeInstance = res.getNodeInstance();
-				List<StepTypes> stepTypes = res.getStepTypes();
-				
-				for (int i=0; i<nodeInstance.size(); i++) {
-					StepTypes type = stepTypes.get(i);
-					if (type==StepTypes.LMGOOD) continue;
-					
-					AlignmentStep step = new AlignmentStep();
-					step.name = nodeInstance.get(i);
-					step.type = type;
-					
-					Integer c = map.get(step);
-					if (c==null)
-						map.put(step,res.getTraceIndex().size());
-					else
-						map.put(step,c+res.getTraceIndex().size());
-				}
-			}	
-		} catch (AStarException e) {
-			e.printStackTrace();
-		}
+		PNRepResult result = this.getPNReplayResults(transitions2costs, events2costs);
 		
-		this.alignmentCostComputations++;
+		for (SyncReplayResult res : result) {
+			List<Object> nodeInstance = res.getNodeInstance();
+			List<StepTypes> stepTypes = res.getStepTypes();
+			
+			for (int i=0; i<nodeInstance.size(); i++) {
+				StepTypes type = stepTypes.get(i);
+				if (type==StepTypes.LMGOOD) continue;
+				
+				AlignmentStep step = new AlignmentStep(nodeInstance.get(i),type);
+				
+				Integer c = map.get(step);
+				if (c==null)
+					map.put(step,res.getTraceIndex().size());
+				else
+					map.put(step,c+res.getTraceIndex().size());
+			}
+		}	
 		
 		return map;
 	}
 	
-	public Map<AlignmentStep,Integer> computeFrequenciesAndCost(Map<Transition,Integer> t2c, Map<XEventClass,Integer> e2c) {
+	private PNRepResult getPNReplayResults(Map<Transition,Integer> transitions2costs, Map<XEventClass,Integer> events2costs) {
 		PetrinetReplayerWithoutILP replayEngine = new PetrinetReplayerWithoutILP();		
-		//AllOptAlignmentsGraphAlg replayEngine = new AllOptAlignmentsGraphAlg();
-		//AllOptAlignmentsGraphILPAlg replayEngine = new AllOptAlignmentsGraphILPAlg();
-		//AllOptAlignmentsTreeAlg replayEngine = new AllOptAlignmentsTreeAlg();
-		//CostBasedCompletePruneAlg replayEngine = new CostBasedCompletePruneAlg();
 		
-		IPNReplayParameter parameters = new CostBasedCompleteParam(e2c,t2c);
+		IPNReplayParameter parameters = new CostBasedCompleteParam(events2costs,transitions2costs);
 		parameters.setInitialMarking(this.initMarking);
 		parameters.setFinalMarkings(this.finalMarkings[0]);
 		parameters.setGUIMode(false);
 		parameters.setCreateConn(false);
 		
+		PNRepResult result = null;
+		try {
+			result = replayEngine.replayLog(context, net, log, mapping, parameters);
+			this.alignmentComputations++;
+		} catch (AStarException e) {
+			e.printStackTrace();
+		}
+		
+		return result;
+	}
+	
+	public Map<AlignmentStep,Integer> computeMovementFrequenciesAndAlignmentCost(Map<Transition,Integer> transitions2costs, Map<XEventClass,Integer> events2costs) {		
 		Map<AlignmentStep,Integer> map = new HashMap<AlignmentStep, Integer>();
-		try {
-			PNRepResult result = replayEngine.replayLog(context, net, log, mapping, parameters);
+		PNRepResult result = this.getPNReplayResults(transitions2costs,events2costs);
 		
-			this.optimalCost = 0;
-			for (SyncReplayResult res : result) {
-				List<Object> nodeInstance = res.getNodeInstance();
-				List<StepTypes> stepTypes = res.getStepTypes();
-				
-				for (int i=0; i<nodeInstance.size(); i++) {
-					StepTypes type = stepTypes.get(i);
-					if (type==StepTypes.LMGOOD) continue;
-					
-					AlignmentStep step = new AlignmentStep();
-					step.name = nodeInstance.get(i);
-					step.type = type;
-					
-					Integer c = map.get(step);
-					if (c==null)
-						map.put(step,res.getTraceIndex().size());
-					else
-						map.put(step,c+res.getTraceIndex().size());
-				}
-				
-				this.optimalCost += ((int) res.getInfo().get("Raw Fitness Cost").doubleValue()) * res.getTraceIndex().size();
-			}	
-		} catch (AStarException e) {
-			e.printStackTrace();
-		}
+		this.optimalAlignmentCost = 0;
 		
-		/*
-		 * int cost = 0;
-		try {
-			PNRepResult result = replayEngine.replayLog(context, net, log, mapping, parameters);
+		for (SyncReplayResult res : result) {
+			List<Object> nodeInstance = res.getNodeInstance();
+			List<StepTypes> stepTypes = res.getStepTypes();
 			
-			for (SyncReplayResult res : result) {
-				cost += res.getInfo().get("Raw Fitness Cost") * res.getTraceIndex().size();
+			for (int i=0; i<nodeInstance.size(); i++) {
+				StepTypes type = stepTypes.get(i);
+				if (type==StepTypes.LMGOOD) continue;
+				
+				AlignmentStep step = new AlignmentStep(nodeInstance.get(i),type);
+
+				Integer c = map.get(step);
+				if (c==null)
+					map.put(step,res.getTraceIndex().size());
+				else
+					map.put(step,c+res.getTraceIndex().size());
 			}
-		} catch (AStarException e) {
-			e.printStackTrace();
-		}
-		 */
-		
-		this.alignmentCostComputations++;
+			
+			this.optimalAlignmentCost += ((int) res.getInfo().get("Raw Fitness Cost").doubleValue()) * res.getTraceIndex().size();
+		}	
 		
 		return map;
 	}
+	
+	protected Map<AlignmentLabel,Integer> computeImpactOfLabelsOnOptimalAlignmentCost(Map<AlignmentStep,Integer> frequencies, Map<Transition,Integer> transitions2costs, Map<XEventClass,Integer> events2costs) {
+		Map<AlignmentLabel,Integer>	result = new HashMap<AlignmentLabel,Integer>();
+		
+		for (Map.Entry<AlignmentStep,Integer> entry : frequencies.entrySet()) {
+			AlignmentStep step = entry.getKey();
+			
+			if (step.type==StepTypes.MREAL) {
+				Transition t = (Transition) step.name;
+				AlignmentLabel label = new AlignmentLabel(t.getLabel(),true);
+				int freq = entry.getValue();
+				
+				if (result.get(label)==null)
+					result.put(label, transitions2costs.get(t)*freq);
+				else
+					result.put(label, result.get(label) + transitions2costs.get(t)*freq);	
+			}
+			else if (step.type==StepTypes.L) {
+				XEventClass e = (XEventClass) step.name;
+				AlignmentLabel label = new AlignmentLabel(e.getId(),false);
+				int freq = entry.getValue();
+				
+				if (result.get(label)==null)
+					result.put(label, events2costs.get(e)*freq);
+				else
+					result.put(label, result.get(label) + events2costs.get(e)*freq);
+			}
+		}
+
+		return result;
+	}
+	
+	protected boolean computeImpactOfLabelsOnOptimalAlignmentCost(Map<AlignmentLabel,Double> labels2impacts, Map<AlignmentStep,Integer> frequencies, RepairRecommendation r, RepairConstraint constraint, Map<Transition,Integer> transitions2costs, Map<XEventClass,Integer> events2costs) {
+		boolean result = false;
+		
+		for (Map.Entry<AlignmentStep,Integer> entry : frequencies.entrySet()) {
+			AlignmentStep step = entry.getKey();
+			
+			if (step.type==StepTypes.MREAL) {
+				if (r.getSkipLabels().contains(((Transition) step.name).getLabel())) continue;
+				
+				Transition t = (Transition) step.name;
+				AlignmentLabel lb = new AlignmentLabel(t.getLabel(),true);
+				
+				int freq = entry.getValue();
+				
+				if (labels2impacts.get(lb)==null) {
+					double impact = transitions2costs.get(t)*freq;
+					
+					if (impact>0 && constraint.getSkipCosts().get(t.getLabel())==0)
+						result = true;
+					
+					labels2impacts.put(lb, impact);
+				}
+				else {
+					double impact = labels2impacts.get(lb) + transitions2costs.get(t)*freq;
+					
+					if (impact>0 && constraint.getSkipCosts().get(t.getLabel())==0)
+						result = true;
+					
+					labels2impacts.put(lb, impact);
+				}
+			}
+			else if (step.type==StepTypes.L) {
+				if (r.getInsertLabels().contains(((XEventClass) step.name).getId())) continue;
+				
+				XEventClass e = (XEventClass) step.name;
+				AlignmentLabel lb = new AlignmentLabel(e.getId(),false);
+				int freq = entry.getValue();
+				
+				if (labels2impacts.get(lb)==null) {
+					double impact = events2costs.get(e)*freq;
+					
+					if (impact>0 && constraint.getInsertCosts().get(e.getId())==0)
+						result = true;
+					
+					labels2impacts.put(lb, impact);
+				}
+				else {
+					double impact = labels2impacts.get(lb) + events2costs.get(e)*freq;
+					
+					if (impact>0 && constraint.getInsertCosts().get(e.getId())==0)
+						result = true;
+					
+					labels2impacts.put(lb, impact);
+				}
+			}
+		}
+		
+		return result;
+	}
+	
+	protected Map<AlignmentLabel,Double> computeImpactPerRepairResource(Map<AlignmentLabel, Double> labels2impacts, RepairConstraint constraint) {
+		Map<AlignmentLabel,Double> result = new HashMap<AlignmentLabel,Double>();
+		
+		for (Map.Entry<AlignmentLabel,Double> entry : labels2impacts.entrySet()) {
+			AlignmentLabel lb = entry.getKey();
+			double impact = entry.getValue();
+			int cost = 0;
+			
+			if (lb.isTransition) cost = constraint.getSkipCosts().get(lb.label);
+			else cost = constraint.getInsertCosts().get(lb.label);
+			
+			result.put(lb, impact / cost);
+		}
+		
+		return result;
+	}
+	
+	protected void filterImpacts(Map<AlignmentLabel,Double> labels2impacts, RepairRecommendation r) {
+		Set<AlignmentLabel> toRemove = new HashSet<AlignmentLabel>();
+		
+		for (Map.Entry<AlignmentLabel,Double> entry : labels2impacts.entrySet()) {
+			AlignmentLabel lb = entry.getKey();
+			
+			if (lb.isTransition && r.getSkipLabels().contains(lb.label))
+				toRemove.add(lb);
+			else if (!lb.isTransition && r.getInsertLabels().contains(lb.label))
+				toRemove.add(lb);
+		}
+		
+		for (AlignmentLabel lb : toRemove)
+			labels2impacts.remove(lb);
+	}
+
 	
 	public class AlignmentStep {
 		public Object	 name = null;
 		public StepTypes type = null;
+		
+		public AlignmentStep(Object name, StepTypes type) {
+			this.name = name;
+			this.type = type;
+		}
 		
 		public int hashCode() {
 			int result = name.hashCode()+11*type.hashCode(); 
@@ -892,6 +639,43 @@ public abstract class RepairRecommendationSearch {
 			if (step.name.equals(this.name) && step.type==this.type) 
 				return true;
 			
+			return false;
+		}
+	}
+	
+	public class AlignmentLabel {
+		private String label = "";
+		private boolean isTransition = false;
+		
+		public AlignmentLabel(String label, boolean isT) {
+			this.label = label;
+			this.isTransition = isT;
+		}
+		
+		public String getLabel() {
+			return this.label;
+		}
+		
+		public boolean isTransition() {
+			return this.isTransition;
+		}
+		
+		@Override
+		public String toString() {
+			return String.format("[%s,%s]", this.label, this.isTransition ? "+" : "-");
+		}
+		
+		public int hashCode() {
+			return label.hashCode() * (isTransition ? 7 : 13);
+		}
+
+		public boolean equals(Object obj) {
+			if (!(obj instanceof AlignmentLabel)) return false;
+			AlignmentLabel that = (AlignmentLabel) obj;
+			
+			if (this.label.equals(that.label) && this.isTransition==that.isTransition)
+				return true;
+				
 			return false;
 		}
 	}
