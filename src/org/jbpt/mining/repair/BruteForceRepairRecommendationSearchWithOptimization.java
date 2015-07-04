@@ -36,16 +36,16 @@ public class BruteForceRepairRecommendationSearchWithOptimization extends Repair
 							RepairRecommendation previousRecommendation, Set<String> labelsI, Set<String> labelsS, boolean first) {
 		
 		if (this.optimalAlignmentCost<=0) return;
+		// recommendation was already visited!
 		if (visited.contains(recommendation)) return;
 		
 		// recommendation is over my budget!
 		if (!CostFunction.isUnderBudget(constraint,recommendation)) {
-			if (computed.contains(previousRecommendation))
-				return;
+			if (computed.contains(previousRecommendation)) return;
 			
 			// prepare cost functions
-			Map<Transition,Integer>  tempMOS = this.getAdjustedCostFuncMOS(recommendation.getSkipLabels());
-			Map<XEventClass,Integer> tempMOT = this.getAdjustedCostFuncMOT(recommendation.getInsertLabels());
+			Map<Transition,Integer>  tempMOS = this.getAdjustedCostFuncMOS(previousRecommendation.getSkipLabels());
+			Map<XEventClass,Integer> tempMOT = this.getAdjustedCostFuncMOT(previousRecommendation.getInsertLabels());
 			
 			// compute cost
 			int cost = this.computeAlignmentCost(tempMOS,tempMOT);
@@ -67,6 +67,7 @@ public class BruteForceRepairRecommendationSearchWithOptimization extends Repair
 			return;
 		}
 		
+		// remember visited recommendations
 		visited.add(recommendation);
 		
 		// make recursive calls
