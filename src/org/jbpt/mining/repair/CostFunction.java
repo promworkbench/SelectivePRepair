@@ -43,7 +43,7 @@ public class CostFunction {
 		}
 		
 		for (String label : recommendation.getSkipLabels()) {
-			Integer cs = constraint.getInsertCosts().get(label);
+			Integer cs = constraint.getSkipCosts().get(label);
 			result += cs == null ? 0 : cs;
 		}
 		
