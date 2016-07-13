@@ -1,4 +1,4 @@
-package org.jbpt.mining.repair.main;
+package org.jbpt.mining.repair.exp;
 
 import java.util.ArrayList;
 import java.util.Arrays;

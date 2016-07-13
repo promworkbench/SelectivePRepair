@@ -1,4 +1,4 @@
-package org.jbpt.mining.repair.main;
+package org.jbpt.mining.repair.exp;
 
 import java.io.BufferedOutputStream;
 import java.io.FileNotFoundException;
@@ -15,7 +15,7 @@ public class Experiment {
 	public static void main(String[] args) throws FileNotFoundException, ClassNotFoundException, NoSuchMethodException, SecurityException, IllegalAccessException, IllegalArgumentException, InvocationTargetException {
 		System.setOut(outputFile(Experiment.outFile));
 		System.setErr(outputFile(Experiment.errFile));
-		Class app = Class.forName("org.jbpt.mining.repair.main.RepairRecommendationSearchExpCSV");
+		Class app = Class.forName("org.jbpt.mining.repair.main.RepairRecommendationSearchExpCSVNew");
 		
 		Method main = app.getDeclaredMethod("main", new Class[] { (new String[1]).getClass()});
 		String[] appArgs = new String[1];
